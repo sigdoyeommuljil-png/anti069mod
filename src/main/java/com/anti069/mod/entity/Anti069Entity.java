@@ -27,6 +27,7 @@ import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.projectile.Snowball;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -76,7 +77,7 @@ public class Anti069Entity extends Monster {
 
     public static AttributeSupplier.Builder createAttributes() {
         return Monster.createMonsterAttributes()
-                .add(Attributes.MAX_HEALTH, 100.0)
+                .add(Attributes.MAX_HEALTH, 120.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.30)
                 .add(Attributes.ATTACK_DAMAGE, 8.0)
                 .add(Attributes.FOLLOW_RANGE, 32.0)
@@ -116,18 +117,41 @@ public class Anti069Entity extends Monster {
         return InteractionResult.SUCCESS;
     }
 
-    /** 공격당함. 각성 후엔 맞아도 즉시 회복(안 죽음). */
+    /**
+     * 데미지 처리.
+     * - 평범 상태: 플레이어에게 죽을 만큼 맞으면 죽지 않고 '각성'. 그 외엔 정상 피해 + 도발.
+     * - 각성 상태: 기본 무적. 단 '불 붙은 채로 눈덩이 맞음'이면 15뎀 관통(죽으면 리스폰 시 정상화).
+     */
     @Override
     public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
-        boolean result = super.hurtServer(level, source, amount);
-        if (source.getEntity() instanceof Player player) {
-            if (isAwakened()) {
-                this.setHealth(this.getMaxHealth());
-            } else {
-                onProvoked(player, true);
+        if (isAwakened()) {
+            boolean weakness = this.isOnFire()
+                    && source.getDirectEntity() instanceof Snowball;
+            if (weakness) {
+                float nh = this.getHealth() - 15.0f;
+                if (nh <= 0.0f) {
+                    // 확실히 죽임(각성 무적 무시) → die()에서 리스폰 예약 = 정상화
+                    return super.hurtServer(level, level.damageSources().genericKill(), Float.MAX_VALUE);
+                }
+                this.setHealth(nh);
+                return true;
             }
+            return false; // 그 외 데미지 무시(무적)
         }
-        return result;
+
+        // 평범 상태
+        if (source.getEntity() instanceof Player player) {
+            // 플레이어에게 죽을 만큼 맞으면 → 죽지 않고 각성
+            if (this.getHealth() - amount <= 0.0f) {
+                this.setHealth(this.getMaxHealth());
+                awaken();
+                return false;
+            }
+            boolean result = super.hurtServer(level, source, amount);
+            onProvoked(player, true);
+            return result;
+        }
+        return super.hurtServer(level, source, amount);
     }
 
     private void onProvoked(Player player, boolean wasHit) {
