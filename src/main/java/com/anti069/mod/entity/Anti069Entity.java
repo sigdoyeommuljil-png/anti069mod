@@ -125,7 +125,9 @@ public class Anti069Entity extends Monster {
     public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
         if (isAwakened()) {
             boolean weakness = this.isOnFire()
-                    && source.getDirectEntity() != null && source.getDirectEntity().getType() == net.minecraft.world.entity.EntityType.SNOWBALL;
+                    && source.getDirectEntity() != null
+                    && net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(source.getDirectEntity().getType()).toString().endsWith("snowball");
             if (weakness) {
                 float nh = this.getHealth() - 15.0f;
                 if (nh <= 0.0f) {
