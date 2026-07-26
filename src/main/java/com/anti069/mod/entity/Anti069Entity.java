@@ -2,6 +2,7 @@ package com.anti069.mod.entity;
 
 import com.anti069.mod.ai.GroqClient;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -25,7 +26,9 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
@@ -46,6 +49,10 @@ public class Anti069Entity extends Monster {
     private int leftTimer = 0;
     private int growlTimer = 0;
     private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
+
+    // 간단한 아이템 목록 인벤토리 (8칸, 처음엔 비어있음).
+    // 나중에 "누가 던져주거나 / 제작" 기능에서 여기에 아이템을 채우게 됩니다.
+    private final NonNullList<ItemStack> inventory = NonNullList.withSize(8, ItemStack.EMPTY);
 
     public Anti069Entity(EntityType<? extends Monster> type, Level level) {
         super(type, level);
@@ -176,6 +183,62 @@ public class Anti069Entity extends Monster {
 
         GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : "...왜?";
+            server.execute(() ->
+                    server.getPlayerList().broadcastSystemMessage(
+                            Component.literal("<anti069> " + line), false));
+        });
+    }
+
+    /** 빈 칸에 아이템 넣기. 성공 시 true. (나중에 던져주기/제작에서 사용) */
+    public boolean addItem(ItemStack stack) {
+        for (int i = 0; i < inventory.size(); i++) {
+            if (inventory.get(i).isEmpty()) {
+                inventory.set(i, stack);
+                return true;
+            }
+        }
+        return false; // 인벤 가득 참
+    }
+
+    /** 죽을 때 호출. 각성 전(평범)일 때만 반응 + 인벤 떨구기. */
+    @Override
+    public void die(DamageSource source) {
+        if (!this.level().isClientSide() && phase != Phase.AWAKENED) {
+            dropInventory();
+            announceDeath();
+            speakDying();
+        }
+        super.die(source);
+    }
+
+    /** 가진 아이템을 바닥에 떨굼. */
+    private void dropInventory() {
+        for (ItemStack stack : inventory) {
+            if (!stack.isEmpty()) {
+                ItemEntity ie = new ItemEntity(this.level(),
+                        this.getX(), this.getY() + 0.5, this.getZ(), stack.copy());
+                this.level().addFreshEntity(ie);
+            }
+        }
+    }
+
+    /** 바닐라와 동일한 형식의 사망 메시지를 채팅에 띄움. */
+    private void announceDeath() {
+        MinecraftServer server = server();
+        if (server == null) return;
+        Component deathMsg = this.getCombatTracker().getDeathMessage();
+        server.getPlayerList().broadcastSystemMessage(deathMsg, false);
+    }
+
+    /** 죽는 순간 Groq로 마지막 대사. */
+    private void speakDying() {
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 방금 죽었다. "
+                + "짧은 한국어 반말 한마디로 죽는 순간의 반응(억울함/놀람/원망 등)을 뱉어라. 대사만.";
+        String situation = "나는 방금 죽었다.";
+        GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
+            String line = (reply != null && !reply.isEmpty()) ? reply : "크윽... 두고 봐...";
             server.execute(() ->
                     server.getPlayerList().broadcastSystemMessage(
                             Component.literal("<anti069> " + line), false));
