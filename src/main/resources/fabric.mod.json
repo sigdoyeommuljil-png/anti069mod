@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "anti069mod",
+  "version": "${version}",
+  "name": "Anti069 NPC Mod",
+  "description": "AI가 조종하는 적대 NPC(anti069ai)와 말하는 중립 NPC(069_36)를 추가하는 모드.",
+  "authors": [
+    "you"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.anti069.mod.Anti069Mod"
+    ],
+    "client": [
+      "com.anti069.mod.Anti069ModClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

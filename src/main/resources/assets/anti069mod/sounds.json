@@ -1,0 +1,10 @@
+{
+  "awaken_roar": {
+    "category": "hostile",
+    "sounds": [ "anti069mod:awaken_roar" ]
+  },
+  "hunt_growl": {
+    "category": "hostile",
+    "sounds": [ "anti069mod:hunt_growl" ]
+  }
+}

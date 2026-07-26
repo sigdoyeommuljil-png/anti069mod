@@ -1,0 +1,47 @@
+// [역할] 실제 빌드 스크립트. 의존성(마크/매핑/Fabric API)을 가져오고
+// 소스를 컴파일해 mods 폴더에 넣을 .jar 를 만들어 줍니다.
+plugins {
+    // fabric-loom: Fabric 모드 개발용 Gradle 플러그인. 26.2 는 Loom 1.17 권장.
+    id 'fabric-loom' version '1.17-SNAPSHOT'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    // Loom 이 마크/매핑을 받아오는 곳들은 대부분 자동 구성됩니다.
+}
+
+dependencies {
+    // 마인크래프트 본체
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    // Yarn 매핑 (사람이 읽기 쉬운 클래스/메서드 이름)
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    // Fabric 로더
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    // Fabric API (엔티티/렌더링 등록 API 제공)
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+// 26.1 이후 그래들 JVM 은 Java 25 이상 필요
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+    it.options.encoding = "UTF-8"
+}
