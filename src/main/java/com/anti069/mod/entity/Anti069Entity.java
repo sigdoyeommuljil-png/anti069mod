@@ -1,123 +1,116 @@
 package com.anti069.mod.entity;
 
 import com.anti069.mod.ai.GroqClient;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.ai.goal.ActiveTargetGoal;
-import net.minecraft.entity.ai.goal.LookAroundGoal;
-import net.minecraft.entity.ai.goal.LookAtEntityGoal;
-import net.minecraft.entity.ai.goal.MeleeAttackGoal;
-import net.minecraft.entity.ai.goal.SwimGoal;
-import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Hand;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.FloatGoal;
+import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 /**
- * [역할] anti069 — 공포 컨셉의 핵심 엔티티.
- *
- * 4단계 상태로 진행됩니다:
- *   PEACEFUL  : 평범한 플레이어인 척 (배회만, 공격 안 함)
- *   WARNING   : 시비/공격 당하면 Groq로 불편해하는 대사
- *   LEFT      : 도발 누적 시 30% 확률로 "나간 척" (노란 퇴장 메시지 + 사라짐) → 60초 대기
- *   AWAKENED  : 괴물로 각성. 포효 + 무한 추적 + 맞아도 안 죽음 + 주기적 그르렁
- *
- * 트리거: 시비(우클릭) 3회 이상 OR 고의 공격 2회 이상 → 30% 확률로 LEFT 진입.
+ * [역할] anti069 — 공포 컨셉 핵심 엔티티. (Mojang 매핑 버전)
+ * PEACEFUL → WARNING → LEFT → AWAKENED 4단계로 진행됩니다.
  */
-public class Anti069Entity extends HostileEntity {
+public class Anti069Entity extends Monster {
 
     private enum Phase { PEACEFUL, WARNING, LEFT, AWAKENED }
 
-    // 각성 여부는 클라이언트(렌더러)도 알아야 해서 DataTracker로 동기화합니다.
-    private static final TrackedData<Boolean> AWAKENED =
-            DataTracker.registerData(Anti069Entity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    // 각성 여부(클라 동기화). Mojang 매핑에선 SynchedEntityData 를 씁니다.
+    private static final EntityDataAccessor<Boolean> AWAKENED =
+            SynchedEntityData.defineId(Anti069Entity.class, EntityDataSerializers.BOOLEAN);
 
     private Phase phase = Phase.PEACEFUL;
-    private int provokeCount = 0; // 시비(우클릭+공격) 누적
-    private int hitCount = 0;     // 고의 공격 누적
-    private int leftTimer = 0;    // "나간 척" 후 각성까지 남은 틱
-    private int growlTimer = 0;   // 추격 중 그르렁 쿨타임
+    private int provokeCount = 0;
+    private int hitCount = 0;
+    private int leftTimer = 0;
+    private int growlTimer = 0;
 
-    public Anti069Entity(EntityType<? extends HostileEntity> entityType, World world) {
-        super(entityType, world);
+    public Anti069Entity(EntityType<? extends Monster> type, Level level) {
+        super(type, level);
     }
 
     @Override
-    protected void initDataTracker(DataTracker.Builder builder) {
-        super.initDataTracker(builder);
-        builder.add(AWAKENED, false);
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(AWAKENED, false);
     }
 
     public boolean isAwakened() {
-        return this.dataTracker.get(AWAKENED);
+        return this.entityData.get(AWAKENED);
     }
 
     private void setAwakened(boolean v) {
-        this.dataTracker.set(AWAKENED, v);
+        this.entityData.set(AWAKENED, v);
     }
 
-    public static DefaultAttributeContainer.Builder createAttributes() {
-        return HostileEntity.createHostileAttributes()
-                .add(EntityAttributes.MAX_HEALTH, 100.0)
-                .add(EntityAttributes.MOVEMENT_SPEED, 0.30)   // 평소 걸음 속도
-                .add(EntityAttributes.ATTACK_DAMAGE, 8.0)
-                .add(EntityAttributes.FOLLOW_RANGE, 32.0)
-                .add(EntityAttributes.KNOCKBACK_RESISTANCE, 1.0);
+    public static AttributeSupplier.Builder createAttributes() {
+        return Monster.createMonsterAttributes()
+                .add(Attributes.MAX_HEALTH, 100.0)
+                .add(Attributes.MOVEMENT_SPEED, 0.30)
+                .add(Attributes.ATTACK_DAMAGE, 8.0)
+                .add(Attributes.FOLLOW_RANGE, 32.0)
+                .add(Attributes.KNOCKBACK_RESISTANCE, 1.0);
     }
 
     @Override
-    protected void initGoals() {
-        this.goalSelector.add(0, new SwimGoal(this));
+    protected void registerGoals() {
+        this.goalSelector.addGoal(0, new FloatGoal(this));
 
-        // [각성 후에만] 목표에게 달려가 계속 근접 공격
-        this.goalSelector.add(1, new MeleeAttackGoal(this, 1.4, true) {
-            @Override public boolean canStart() { return isAwakened() && super.canStart(); }
-            @Override public boolean shouldContinue() { return isAwakened() && super.shouldContinue(); }
+        // [각성 후에만] 근접 공격
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.4, true) {
+            @Override public boolean canUse() { return isAwakened() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isAwakened() && super.canContinueToUse(); }
         });
 
-        // [평소에만] 느긋하게 배회
-        this.goalSelector.add(6, new WanderAroundFarGoal(this, 0.7) {
-            @Override public boolean canStart() { return !isAwakened() && super.canStart(); }
+        // [평소에만] 배회
+        this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 0.7) {
+            @Override public boolean canUse() { return !isAwakened() && super.canUse(); }
         });
-        this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(8, new LookAroundGoal(this));
+        this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
 
         // [각성 후에만] 항상 가장 가까운 플레이어를 적으로
-        this.targetSelector.add(1, new ActiveTargetGoal<>(this, PlayerEntity.class, true) {
-            @Override public boolean canStart() { return isAwakened() && super.canStart(); }
-            @Override public boolean shouldContinue() { return isAwakened() && super.shouldContinue(); }
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, true) {
+            @Override public boolean canUse() { return isAwakened() && super.canUse(); }
+            @Override public boolean canContinueToUse() { return isAwakened() && super.canContinueToUse(); }
         });
     }
 
-    /** 우클릭 = 시비. 각성 전에만 도발로 처리. */
+    /** 우클릭 = 시비 */
     @Override
-    public ActionResult interactMob(PlayerEntity player, Hand hand) {
-        if (!this.getWorld().isClient && phase != Phase.LEFT && phase != Phase.AWAKENED) {
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        if (!this.level().isClientSide && phase != Phase.LEFT && phase != Phase.AWAKENED) {
             onProvoked(player, false);
         }
-        return ActionResult.SUCCESS;
+        return InteractionResult.SUCCESS;
     }
 
-    /** 공격당함. 각성 후엔 맞아도 즉시 회복(안 죽음), 각성 전엔 도발로 처리. */
+    /** 공격당함. 각성 후엔 맞아도 즉시 회복(안 죽음). */
     @Override
-    public boolean damage(ServerWorld world, DamageSource source, float amount) {
-        boolean result = super.damage(world, source, amount);
-        if (source.getAttacker() instanceof PlayerEntity player) {
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        boolean result = super.hurtServer(level, source, amount);
+        if (source.getEntity() instanceof Player player) {
             if (isAwakened()) {
-                this.setHealth(this.getMaxHealth()); // 데미지 표시는 나지만 안 죽음
+                this.setHealth(this.getMaxHealth());
             } else {
                 onProvoked(player, true);
             }
@@ -125,38 +118,34 @@ public class Anti069Entity extends HostileEntity {
         return result;
     }
 
-    /** 도발 처리 + 대사 + 페이크 퇴장 판정. */
-    private void onProvoked(PlayerEntity player, boolean wasHit) {
+    private void onProvoked(Player player, boolean wasHit) {
         if (phase == Phase.LEFT || phase == Phase.AWAKENED) return;
         provokeCount++;
         if (wasHit) hitCount++;
         phase = Phase.WARNING;
 
-        speakAnnoyed(player, wasHit);
+        speakAnnoyed(wasHit);
 
-        // 시비 3회 이상 OR 고의 공격 2회 이상 → 30% 확률로 나간 척
         if ((provokeCount >= 3 || hitCount >= 2) && this.random.nextFloat() < 0.30f) {
             fakeLeave();
         }
     }
 
-    /** Groq로 "불편해하는" 대사를 생성해 채팅에 출력. 실패 시 기본 대사. */
-    private void speakAnnoyed(PlayerEntity player, boolean wasHit) {
+    private void speakAnnoyed(boolean wasHit) {
         final MinecraftServer server = this.getServer();
         if (server == null) return;
 
         String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. "
                 + "지금 다른 플레이어가 너에게 시비를 걸거나 때리고 있다. "
-                + "짧고 자연스러운 한국어 반말 한 문장으로, 점점 불편하고 짜증나는 감정을 드러내라. "
-                + "이모지나 설명 없이 대사만.";
+                + "짧고 자연스러운 한국어 반말 한 문장으로 점점 불편하고 짜증나는 감정을 드러내라. 대사만.";
         String situation = (wasHit ? "플레이어가 나를 때렸다." : "플레이어가 나에게 시비를 건다.")
                 + " (누적 도발 " + provokeCount + "회)";
 
         GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : defaultAnnoyed();
-            // 답은 딴 스레드에서 오므로, 서버 스레드에 얹어서 채팅 출력
             server.execute(() ->
-                    server.getPlayerManager().broadcast(Text.literal("<anti069> " + line), false));
+                    server.getPlayerList().broadcastSystemMessage(
+                            Component.literal("<anti069> " + line), false));
         });
     }
 
@@ -165,62 +154,54 @@ public class Anti069Entity extends HostileEntity {
         return f[this.random.nextInt(f.length)];
     }
 
-    /** "나간 척": 바닐라와 동일한 노란 퇴장 메시지 + 화면에서 사라짐. 60초 뒤 각성. */
+    /** "나간 척": 바닐라와 동일한 노란 퇴장 메시지 + 사라짐. 60초 뒤 각성. */
     private void fakeLeave() {
         phase = Phase.LEFT;
-        leftTimer = 20 * 60; // 60초
+        leftTimer = 20 * 60;
         MinecraftServer server = this.getServer();
         if (server != null) {
-            // 바닐라 실제 퇴장 메시지와 100% 동일한 번역키+노란색
-            Text msg = Text.translatable("multiplayer.player.left", Text.literal("anti069"))
-                    .formatted(Formatting.YELLOW);
-            server.getPlayerManager().broadcast(msg, false);
+            Component msg = Component.translatable("multiplayer.player.left",
+                    Component.literal("anti069")).withStyle(ChatFormatting.YELLOW);
+            server.getPlayerList().broadcastSystemMessage(msg, false);
         }
-        // 진짜 나간 것처럼: 투명 + AI 정지 + 무적 + 통과
         this.setInvisible(true);
-        this.setAiDisabled(true);
+        this.setNoAi(true);
         this.setInvulnerable(true);
-        this.noClip = true;
+        this.noPhysics = true;
         this.setSilent(true);
     }
 
-    /** 각성: 괴물로 변신. */
     private void awaken() {
         phase = Phase.AWAKENED;
-        setAwakened(true); // 클라 동기화 → 모델 변형 + 텍스처 교체
+        setAwakened(true);
 
         this.setInvisible(false);
-        this.setAiDisabled(false);
-        this.setInvulnerable(false); // 데미지는 받되 위 damage()에서 회복
-        this.noClip = false;
+        this.setNoAi(false);
+        this.setInvulnerable(false);
+        this.noPhysics = false;
         this.setSilent(false);
 
-        // 능력치 강화: 빠르고 멀리서도 추적
-        EntityAttributeInstance spd = this.getAttributeInstance(EntityAttributes.MOVEMENT_SPEED);
+        AttributeInstance spd = this.getAttribute(Attributes.MOVEMENT_SPEED);
         if (spd != null) spd.setBaseValue(0.45);
-        EntityAttributeInstance range = this.getAttributeInstance(EntityAttributes.FOLLOW_RANGE);
+        AttributeInstance range = this.getAttribute(Attributes.FOLLOW_RANGE);
         if (range != null) range.setBaseValue(256.0);
 
-        // 포효 1회
-        this.getWorld().playSound(null, this.getX(), this.getY(), this.getZ(),
-                ModSounds.AWAKEN_ROAR, SoundCategory.HOSTILE, 2.0f, 1.0f);
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                ModSounds.AWAKEN_ROAR, SoundSource.HOSTILE, 2.0f, 1.0f);
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (this.getWorld().isClient) return;
+        if (this.level().isClientSide) return;
 
         if (phase == Phase.LEFT) {
-            if (--leftTimer <= 0) {
-                awaken();
-            }
+            if (--leftTimer <= 0) awaken();
         } else if (phase == Phase.AWAKENED) {
-            // 추격 중 주기적으로 그르렁
             if (--growlTimer <= 0) {
                 growlTimer = 60 + this.random.nextInt(80);
-                this.getWorld().playSound(null, this.getX(), this.getY(), this.getZ(),
-                        ModSounds.HUNT_GROWL, SoundCategory.HOSTILE, 1.4f, 1.0f);
+                this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        ModSounds.HUNT_GROWL, SoundSource.HOSTILE, 1.4f, 1.0f);
             }
         }
     }

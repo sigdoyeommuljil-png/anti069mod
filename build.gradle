@@ -20,11 +20,11 @@ repositories {
 dependencies {
     // 마인크래프트 본체
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    // Yarn 매핑 (사람이 읽기 쉬운 클래스/메서드 이름)
-    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    // 26.1부터 Yarn 폐지 → Mojang 공식 매핑 사용
+    mappings loom.officialMojangMappings()
     // Fabric 로더
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    // Fabric API (엔티티/렌더링 등록 API 제공)
+    // Fabric API
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
 
