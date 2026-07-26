@@ -27,7 +27,6 @@ import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.projectile.Snowball;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -126,7 +125,7 @@ public class Anti069Entity extends Monster {
     public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
         if (isAwakened()) {
             boolean weakness = this.isOnFire()
-                    && source.getDirectEntity() instanceof Snowball;
+                    && source.getDirectEntity() != null && source.getDirectEntity().getType() == net.minecraft.world.entity.EntityType.SNOWBALL;
             if (weakness) {
                 float nh = this.getHealth() - 15.0f;
                 if (nh <= 0.0f) {
