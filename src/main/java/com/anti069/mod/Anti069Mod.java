@@ -7,6 +7,7 @@ import com.anti069.mod.entity.Neutral06936Entity;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.AABB;
@@ -36,7 +37,7 @@ public class Anti069Mod implements ModInitializer {
     /** 플레이어 채팅 시 근처 069_36 이 Groq로 답합니다. */
     private void registerNeutralChatListener() {
         ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
-            ServerLevel level = sender.serverLevel();
+            ServerLevel level = (ServerLevel) sender.level();
             AABB area = sender.getBoundingBox().inflate(TALK_RANGE);
 
             List<Neutral06936Entity> nearby =
@@ -56,8 +57,9 @@ public class Anti069Mod implements ModInitializer {
         GroqClient.ask("groq_key_neutral.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty())
                     ? reply : "음... 잘 못 들었어. 다시 말해줄래?";
-            sender.getServer().execute(() ->
-                    sender.getServer().getPlayerList()
+            MinecraftServer server = ((ServerLevel) sender.level()).getServer();
+            server.execute(() ->
+                    server.getPlayerList()
                             .broadcastSystemMessage(Component.literal("<069_36> " + line), false));
         });
     }

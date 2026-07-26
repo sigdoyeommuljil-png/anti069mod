@@ -98,7 +98,7 @@ public class Anti069Entity extends Monster {
     /** 우클릭 = 시비 */
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
-        if (!this.level().isClientSide && phase != Phase.LEFT && phase != Phase.AWAKENED) {
+        if (!this.level().isClientSide() && phase != Phase.LEFT && phase != Phase.AWAKENED) {
             onProvoked(player, false);
         }
         return InteractionResult.SUCCESS;
@@ -132,7 +132,7 @@ public class Anti069Entity extends Monster {
     }
 
     private void speakAnnoyed(boolean wasHit) {
-        final MinecraftServer server = this.getServer();
+        final MinecraftServer server = server();
         if (server == null) return;
 
         String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. "
@@ -154,11 +154,16 @@ public class Anti069Entity extends Monster {
         return f[this.random.nextInt(f.length)];
     }
 
+    /** 서버 인스턴스를 얻는 도우미. 26.2에선 엔티티에 getServer()가 없어서 ServerLevel 경유. */
+    private MinecraftServer server() {
+        return this.level() instanceof ServerLevel sl ? sl.getServer() : null;
+    }
+
     /** "나간 척": 바닐라와 동일한 노란 퇴장 메시지 + 사라짐. 60초 뒤 각성. */
     private void fakeLeave() {
         phase = Phase.LEFT;
         leftTimer = 20 * 60;
-        MinecraftServer server = this.getServer();
+        MinecraftServer server = server();
         if (server != null) {
             Component msg = Component.translatable("multiplayer.player.left",
                     Component.literal("anti069")).withStyle(ChatFormatting.YELLOW);
@@ -193,7 +198,7 @@ public class Anti069Entity extends Monster {
     @Override
     public void tick() {
         super.tick();
-        if (this.level().isClientSide) return;
+        if (this.level().isClientSide()) return;
 
         if (phase == Phase.LEFT) {
             if (--leftTimer <= 0) awaken();

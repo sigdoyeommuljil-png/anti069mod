@@ -6,7 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * [역할] anti069 렌더러. 각성 시 피칠갑 스킨으로 교체 + 크게(1.8배). (Mojang 매핑)
@@ -15,10 +15,10 @@ import net.minecraft.resources.ResourceLocation;
 public class Anti069Renderer
         extends LivingEntityRenderer<Anti069Entity, Anti069RenderState, Anti069Model> {
 
-    private static final ResourceLocation NORMAL =
-            ResourceLocation.fromNamespaceAndPath(Anti069Mod.MOD_ID, "textures/entity/anti069_normal.png");
-    private static final ResourceLocation AWAKENED =
-            ResourceLocation.fromNamespaceAndPath(Anti069Mod.MOD_ID, "textures/entity/anti069_awakened.png");
+    private static final Identifier NORMAL =
+            Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, "textures/entity/anti069_normal.png");
+    private static final Identifier AWAKENED =
+            Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, "textures/entity/anti069_awakened.png");
 
     public Anti069Renderer(EntityRendererProvider.Context ctx) {
         super(ctx, new Anti069Model(ctx.bakeLayer(ModelLayers.PLAYER)), 0.5f);
@@ -36,7 +36,7 @@ public class Anti069Renderer
     }
 
     @Override
-    public ResourceLocation getTextureLocation(Anti069RenderState state) {
+    public Identifier getTextureLocation(Anti069RenderState state) {
         return state.awakened ? AWAKENED : NORMAL;
     }
 

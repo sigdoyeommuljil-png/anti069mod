@@ -3,7 +3,7 @@ package com.anti069.mod.entity;
 import com.anti069.mod.Anti069Mod;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvent;
 
 /**
@@ -15,7 +15,7 @@ public class ModSounds {
     public static final SoundEvent HUNT_GROWL = register("hunt_growl");
 
     private static SoundEvent register(String name) {
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(Anti069Mod.MOD_ID, name);
+        Identifier id = Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, name);
         return Registry.register(BuiltInRegistries.SOUND_EVENT, id,
                 SoundEvent.createVariableRangeEvent(id));
     }

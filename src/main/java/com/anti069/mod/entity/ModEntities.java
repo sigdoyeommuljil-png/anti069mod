@@ -6,7 +6,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -18,7 +18,7 @@ public class ModEntities {
 
     public static final ResourceKey<EntityType<?>> ANTI069_KEY =
             ResourceKey.create(Registries.ENTITY_TYPE,
-                    ResourceLocation.fromNamespaceAndPath(Anti069Mod.MOD_ID, "anti069"));
+                    Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, "anti069"));
 
     public static final EntityType<Anti069Entity> ANTI069 = register(
             ANTI069_KEY,
@@ -30,7 +30,7 @@ public class ModEntities {
 
     public static final ResourceKey<EntityType<?>> NEUTRAL06936_KEY =
             ResourceKey.create(Registries.ENTITY_TYPE,
-                    ResourceLocation.fromNamespaceAndPath(Anti069Mod.MOD_ID, "069_36"));
+                    Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, "069_36"));
 
     public static final EntityType<Neutral06936Entity> NEUTRAL06936 = register(
             NEUTRAL06936_KEY,
