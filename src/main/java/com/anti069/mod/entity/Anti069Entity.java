@@ -49,6 +49,7 @@ public class Anti069Entity extends Monster {
     private int leftTimer = 0;
     private int growlTimer = 0;
     private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
+    private int idleTimer = 100;  // 혼잣말 타이머
 
     // 간단한 아이템 목록 인벤토리 (8칸, 처음엔 비어있음).
     // 나중에 "누가 던져주거나 / 제작" 기능에서 여기에 아이템을 채우게 됩니다.
@@ -208,6 +209,9 @@ public class Anti069Entity extends Monster {
             announceDeath();
             speakDying();
         }
+        if (this.level() instanceof ServerLevel sl) {
+            com.anti069.mod.Anti069Mod.scheduleRespawn(sl, this.getX(), this.getY(), this.getZ(), ModEntities.ANTI069);
+        }
         super.die(source);
     }
 
@@ -239,6 +243,23 @@ public class Anti069Entity extends Monster {
         String situation = "나는 방금 죽었다.";
         GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : "크윽... 두고 봐...";
+            server.execute(() ->
+                    server.getPlayerList().broadcastSystemMessage(
+                            Component.literal("<anti069> " + line), false));
+        });
+    }
+
+    /** 자아 있는 느낌의 혼잣말 (까칠하게). */
+    private void idleTalk() {
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. "
+                + "지금 월드를 둘러보며 혼잣말을 한다. 자아가 있는 것처럼, 방금 든 생각이나 관찰을 자연스럽게. "
+                + "반드시 한국어(한글)로만, 영어 절대 금지. 짧은 반말 한마디. 대사만.";
+        GroqClient.ask("groq_key_hostile.txt", persona, "혼잣말을 한다.", reply -> {
+            String line = (reply != null && !reply.isEmpty()) ? reply : "...심심하네.";
             server.execute(() ->
                     server.getPlayerList().broadcastSystemMessage(
                             Component.literal("<anti069> " + line), false));
@@ -292,6 +313,16 @@ public class Anti069Entity extends Monster {
         if (this.level().isClientSide()) return;
 
         if (talkCooldown > 0) talkCooldown--; // 대사 쿨타임 감소
+
+        if (phase == Phase.PEACEFUL || phase == Phase.WARNING) {
+            // 근처에 플레이어 있으면 5초쯤마다 혼잣말
+            if (--idleTimer <= 0) {
+                idleTimer = 100 + this.random.nextInt(60); // 5~8초
+                if (this.level().getNearestPlayer(this, 24.0) != null) {
+                    idleTalk();
+                }
+            }
+        }
 
         if (phase == Phase.LEFT) {
             if (--leftTimer <= 0) awaken();

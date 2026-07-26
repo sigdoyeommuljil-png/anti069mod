@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 public class Neutral06936Entity extends PathfinderMob {
 
     private int talkCooldown = 0;  // 20틱=1초
+    private int idleTimer = 100;   // 혼잣말 타이머
     private int annoyed = 0;       // 맞은 횟수 → 대사가 점점 화남
     private final NonNullList<ItemStack> inventory = NonNullList.withSize(8, ItemStack.EMPTY);
 
@@ -55,6 +56,26 @@ public class Neutral06936Entity extends PathfinderMob {
         super.tick();
         if (this.level().isClientSide()) return;
         if (talkCooldown > 0) talkCooldown--;
+
+        // 근처 플레이어 있으면 5초쯤마다 혼잣말
+        if (--idleTimer <= 0) {
+            idleTimer = 100 + this.random.nextInt(60);
+            if (this.level().getNearestPlayer(this, 24.0) != null) {
+                idleTalk();
+            }
+        }
+    }
+
+    /** 자아 있는 느낌의 혼잣말 (쿨하게). */
+    private void idleTalk() {
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = personaBase()
+                + "지금 월드를 둘러보며 혼잣말을 한다. 자아가 있는 것처럼, 방금 든 생각이나 관찰을 자연스럽게. "
+                + "반드시 한국어(한글)로만, 영어 절대 금지. 짧은 반말 한마디. 대사만.";
+        askAndSay(server, persona, "혼잣말을 한다.", "흐음.");
     }
 
     /** 맞으면 좀 화냄 (대사가 점점 세짐). */
@@ -117,6 +138,9 @@ public class Neutral06936Entity extends PathfinderMob {
             dropInventory();
             announceDeath();
             speakDying();
+        }
+        if (this.level() instanceof ServerLevel sl) {
+            com.anti069.mod.Anti069Mod.scheduleRespawn(sl, this.getX(), this.getY(), this.getZ(), ModEntities.NEUTRAL06936);
         }
         super.die(source);
     }
