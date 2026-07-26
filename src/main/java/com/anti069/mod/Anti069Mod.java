@@ -74,7 +74,7 @@ public class Anti069Mod implements ModInitializer {
                 if (--p.ticks <= 0) {
                     Entity e = p.type.create(p.level, EntitySpawnReason.MOB_SUMMONED);
                     if (e != null) {
-                        e.moveTo(p.x, p.y, p.z, 0.0f, 0.0f);
+                        e.setPos(p.x, p.y, p.z);
                         p.level.addFreshEntity(e);
                     }
                     it.remove();
