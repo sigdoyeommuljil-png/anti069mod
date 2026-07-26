@@ -12,6 +12,8 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -43,6 +45,7 @@ public class Anti069Entity extends Monster {
     private int hitCount = 0;
     private int leftTimer = 0;
     private int growlTimer = 0;
+    private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
 
     public Anti069Entity(EntityType<? extends Monster> type, Level level) {
         super(type, level);
@@ -132,6 +135,8 @@ public class Anti069Entity extends Monster {
     }
 
     private void speakAnnoyed(boolean wasHit) {
+        if (talkCooldown > 0) return;   // 1초 쿨타임
+        talkCooldown = 20;
         final MinecraftServer server = server();
         if (server == null) return;
 
@@ -154,6 +159,29 @@ public class Anti069Entity extends Monster {
         return f[this.random.nextInt(f.length)];
     }
 
+    /** 근처에서 플레이어가 채팅치면 호출됨. 평소엔 태연, 도발 쌓이면 짜증. 1초 쿨타임. */
+    public void heardChat(String playerText) {
+        if (phase == Phase.LEFT || phase == Phase.AWAKENED) return;
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+
+        String mood = (provokeCount == 0)
+                ? "너는 평범하고 태연한 척한다."
+                : "너는 이미 좀 짜증이 나 있다 (누적 도발 " + provokeCount + "회).";
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. " + mood
+                + " 짧고 자연스러운 한국어 반말 한 문장으로 대답하라. 대사만.";
+        String situation = "플레이어가 너에게 말했다: \"" + playerText + "\"";
+
+        GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
+            String line = (reply != null && !reply.isEmpty()) ? reply : "...왜?";
+            server.execute(() ->
+                    server.getPlayerList().broadcastSystemMessage(
+                            Component.literal("<anti069> " + line), false));
+        });
+    }
+
     /** 서버 인스턴스를 얻는 도우미. 26.2에선 엔티티에 getServer()가 없어서 ServerLevel 경유. */
     private MinecraftServer server() {
         return this.level() instanceof ServerLevel sl ? sl.getServer() : null;
@@ -162,7 +190,7 @@ public class Anti069Entity extends Monster {
     /** "나간 척": 바닐라와 동일한 노란 퇴장 메시지 + 사라짐. 60초 뒤 각성. */
     private void fakeLeave() {
         phase = Phase.LEFT;
-        leftTimer = 20 * 60;
+        leftTimer = 20 * 25; // 25초
         MinecraftServer server = server();
         if (server != null) {
             Component msg = Component.translatable("multiplayer.player.left",
@@ -192,7 +220,7 @@ public class Anti069Entity extends Monster {
         if (range != null) range.setBaseValue(256.0);
 
         this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
-                ModSounds.AWAKEN_ROAR, SoundSource.HOSTILE, 2.0f, 1.0f);
+                ModSounds.AWAKEN_ROAR, SoundSource.HOSTILE, 0.8f, 1.0f);
     }
 
     @Override
@@ -200,13 +228,24 @@ public class Anti069Entity extends Monster {
         super.tick();
         if (this.level().isClientSide()) return;
 
+        if (talkCooldown > 0) talkCooldown--; // 대사 쿨타임 감소
+
         if (phase == Phase.LEFT) {
             if (--leftTimer <= 0) awaken();
         } else if (phase == Phase.AWAKENED) {
+            // 추격 중 주기적으로 그르렁 (볼륨 낮춤)
             if (--growlTimer <= 0) {
                 growlTimer = 60 + this.random.nextInt(80);
                 this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
-                        ModSounds.HUNT_GROWL, SoundSource.HOSTILE, 1.4f, 1.0f);
+                        ModSounds.HUNT_GROWL, SoundSource.HOSTILE, 0.5f, 1.0f);
+            }
+            // 각성 상태에서 30블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
+            if (this.tickCount % 10 == 0) {
+                for (Player p : this.level().players()) {
+                    if (p.distanceToSqr(this) <= 30.0 * 30.0) {
+                        p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 30, 0, false, false));
+                    }
+                }
             }
         }
     }

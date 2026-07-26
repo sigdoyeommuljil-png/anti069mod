@@ -1,6 +1,7 @@
 package com.anti069.mod;
 
 import com.anti069.mod.ai.GroqClient;
+import com.anti069.mod.entity.Anti069Entity;
 import com.anti069.mod.entity.ModEntities;
 import com.anti069.mod.entity.ModSounds;
 import com.anti069.mod.entity.Neutral06936Entity;
@@ -39,13 +40,21 @@ public class Anti069Mod implements ModInitializer {
         ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
             ServerLevel level = (ServerLevel) sender.level();
             AABB area = sender.getBoundingBox().inflate(TALK_RANGE);
-
-            List<Neutral06936Entity> nearby =
-                    level.getEntitiesOfClass(Neutral06936Entity.class, area, e -> true);
-            if (nearby.isEmpty()) return;
-
             String playerText = message.decoratedContent().getString();
-            respondAsNeutral(sender, playerText);
+
+            // 069_36 (중립) 반응
+            List<Neutral06936Entity> neutrals =
+                    level.getEntitiesOfClass(Neutral06936Entity.class, area, e -> true);
+            if (!neutrals.isEmpty()) {
+                respondAsNeutral(sender, playerText);
+            }
+
+            // anti069 반응 (근처에 있으면 첫 번째가 대답)
+            List<Anti069Entity> antis =
+                    level.getEntitiesOfClass(Anti069Entity.class, area, e -> true);
+            if (!antis.isEmpty()) {
+                antis.get(0).heardChat(playerText);
+            }
         });
     }
 
