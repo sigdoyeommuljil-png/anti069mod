@@ -42,11 +42,11 @@ public class Anti069Mod implements ModInitializer {
             AABB area = sender.getBoundingBox().inflate(TALK_RANGE);
             String playerText = message.decoratedContent().getString();
 
-            // 069_36 (중립) 반응
+            // 069_36 (중립 클론) 반응 — 쿨타임/성격은 엔티티가 처리
             List<Neutral06936Entity> neutrals =
                     level.getEntitiesOfClass(Neutral06936Entity.class, area, e -> true);
             if (!neutrals.isEmpty()) {
-                respondAsNeutral(sender, playerText);
+                neutrals.get(0).heardChat(playerText);
             }
 
             // anti069 반응 (근처에 있으면 첫 번째가 대답)
@@ -58,18 +58,5 @@ public class Anti069Mod implements ModInitializer {
         });
     }
 
-    private void respondAsNeutral(ServerPlayer sender, String playerText) {
-        String persona = "너는 마인크래프트 서버의 평화롭고 친근한 안내자 NPC '069_36'이다. "
-                + "짧고 자연스러운 한국어 한두 문장으로 친근하게 답하라. 대사만.";
-        String situation = "플레이어가 말했다: \"" + playerText + "\"";
 
-        GroqClient.ask("groq_key_neutral.txt", persona, situation, reply -> {
-            String line = (reply != null && !reply.isEmpty())
-                    ? reply : "음... 잘 못 들었어. 다시 말해줄래?";
-            MinecraftServer server = ((ServerLevel) sender.level()).getServer();
-            server.execute(() ->
-                    server.getPlayerList()
-                            .broadcastSystemMessage(Component.literal("<069_36> " + line), false));
-        });
-    }
 }

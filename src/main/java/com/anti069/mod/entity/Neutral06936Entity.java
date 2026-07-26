@@ -1,5 +1,11 @@
 package com.anti069.mod.entity;
 
+import com.anti069.mod.ai.GroqClient;
+import net.minecraft.core.NonNullList;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
@@ -9,14 +15,20 @@ import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * [역할] 069_36 — 친근한 중립 대화 NPC. (Mojang 매핑)
- * 먼저 공격하지 않고, 대화는 Anti069Mod 채팅 리스너에서 처리합니다.
+ * [역할] 069_36 — 서버 주인의 클론 NPC. 쿨하고 시크한 성격, 맞으면 좀 화냄.
+ * anti069 가 가진 기본 기능(대사 쿨타임 + 인벤토리 + 죽음 반응)을 동일하게 가짐.
  */
 public class Neutral06936Entity extends PathfinderMob {
+
+    private int talkCooldown = 0;  // 20틱=1초
+    private int annoyed = 0;       // 맞은 횟수 → 대사가 점점 화남
+    private final NonNullList<ItemStack> inventory = NonNullList.withSize(8, ItemStack.EMPTY);
 
     public Neutral06936Entity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
@@ -36,5 +48,115 @@ public class Neutral06936Entity extends PathfinderMob {
         this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
         // 목표 선정 goal 없음 → 중립
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (this.level().isClientSide()) return;
+        if (talkCooldown > 0) talkCooldown--;
+    }
+
+    /** 맞으면 좀 화냄 (대사가 점점 세짐). */
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        boolean result = super.hurtServer(level, source, amount);
+        if (source.getEntity() instanceof Player) {
+            annoyed++;
+            speakHurt();
+        }
+        return result;
+    }
+
+    /** 근처 채팅에 반응. 쿨하게, 맞았으면 화내면서. 1초 쿨타임. */
+    public void heardChat(String playerText) {
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+
+        String mood = (annoyed == 0)
+                ? "지금은 기분이 나쁘지 않다."
+                : "방금 맞아서 좀 화가 나 있다.";
+        String persona = personaBase() + mood
+                + " 반드시 한국어(한글)로만, 영어 절대 섞지 말고 짧게 답하라. 대사만.";
+        String situation = "플레이어가 너에게 말했다: \"" + playerText + "\"";
+        askAndSay(server, persona, situation, "...뭐.");
+    }
+
+    private void speakHurt() {
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = personaBase() + "방금 플레이어한테 맞았다. 살짝 화내라. "
+                + "반드시 한국어(한글)로만, 영어 섞지 말고 짧은 반말 한마디. 대사만.";
+        askAndSay(server, persona, "플레이어가 나를 때렸다. (누적 " + annoyed + "회)", "아, 왜 때려.");
+    }
+
+    /** 069_36 공통 성격 설명. */
+    private String personaBase() {
+        return "너는 이 서버 주인을 본뜬 클론 NPC '069_36'이다. 평소엔 쿨하고 시크하며 담백하게 짧게 말한다. ";
+    }
+
+    // ---- 인벤토리 ----
+    public boolean addItem(ItemStack stack) {
+        for (int i = 0; i < inventory.size(); i++) {
+            if (inventory.get(i).isEmpty()) {
+                inventory.set(i, stack);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // ---- 죽음 ----
+    @Override
+    public void die(DamageSource source) {
+        if (!this.level().isClientSide()) {
+            dropInventory();
+            announceDeath();
+            speakDying();
+        }
+        super.die(source);
+    }
+
+    private void dropInventory() {
+        for (ItemStack stack : inventory) {
+            if (!stack.isEmpty()) {
+                ItemEntity ie = new ItemEntity(this.level(),
+                        this.getX(), this.getY() + 0.5, this.getZ(), stack.copy());
+                this.level().addFreshEntity(ie);
+            }
+        }
+    }
+
+    private void announceDeath() {
+        MinecraftServer server = server();
+        if (server == null) return;
+        server.getPlayerList().broadcastSystemMessage(
+                this.getCombatTracker().getDeathMessage(), false);
+    }
+
+    private void speakDying() {
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = personaBase() + "방금 죽었다. "
+                + "반드시 한국어(한글)로만, 영어 섞지 말고 쿨하게 짧은 반말 한마디 남겨라. 대사만.";
+        askAndSay(server, persona, "나는 방금 죽었다.", "쳇, 이렇게 가네.");
+    }
+
+    /** Groq 호출 + 실패 시 기본 대사, 서버 스레드에서 채팅 출력. */
+    private void askAndSay(MinecraftServer server, String persona, String situation, String fallback) {
+        GroqClient.ask("groq_key_neutral.txt", persona, situation, reply -> {
+            String line = (reply != null && !reply.isEmpty()) ? reply : fallback;
+            server.execute(() ->
+                    server.getPlayerList().broadcastSystemMessage(
+                            Component.literal("<069_36> " + line), false));
+        });
+    }
+
+    private MinecraftServer server() {
+        return this.level() instanceof ServerLevel sl ? sl.getServer() : null;
     }
 }

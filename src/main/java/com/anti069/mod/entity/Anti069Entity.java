@@ -147,9 +147,9 @@ public class Anti069Entity extends Monster {
         final MinecraftServer server = server();
         if (server == null) return;
 
-        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. "
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하고 예민하다. "
                 + "지금 다른 플레이어가 너에게 시비를 걸거나 때리고 있다. "
-                + "짧고 자연스러운 한국어 반말 한 문장으로 점점 불편하고 짜증나는 감정을 드러내라. 대사만.";
+                + "반드시 한국어(한글)로만 말하고 영어는 절대 섞지 마라. 짧은 반말 한 문장으로 점점 불편하고 짜증나는 감정을 드러내라. 대사만.";
         String situation = (wasHit ? "플레이어가 나를 때렸다." : "플레이어가 나에게 시비를 건다.")
                 + " (누적 도발 " + provokeCount + "회)";
 
@@ -177,8 +177,8 @@ public class Anti069Entity extends Monster {
         String mood = (provokeCount == 0)
                 ? "너는 평범하고 태연한 척한다."
                 : "너는 이미 좀 짜증이 나 있다 (누적 도발 " + provokeCount + "회).";
-        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. " + mood
-                + " 짧고 자연스러운 한국어 반말 한 문장으로 대답하라. 대사만.";
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. " + mood
+                + " 반드시 한국어(한글)로만 말하고 영어는 절대 섞지 마라. 짧은 반말 한 문장으로 대답하라. 대사만.";
         String situation = "플레이어가 너에게 말했다: \"" + playerText + "\"";
 
         GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
@@ -234,8 +234,8 @@ public class Anti069Entity extends Monster {
     private void speakDying() {
         final MinecraftServer server = server();
         if (server == null) return;
-        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 방금 죽었다. "
-                + "짧은 한국어 반말 한마디로 죽는 순간의 반응(억울함/놀람/원망 등)을 뱉어라. 대사만.";
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. 방금 죽었다. "
+                + "반드시 한국어(한글)로만, 영어 섞지 말고 짧은 반말 한마디로 죽는 순간의 반응(억울함/놀람/원망 등)을 뱉어라. 대사만.";
         String situation = "나는 방금 죽었다.";
         GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : "크윽... 두고 봐...";
