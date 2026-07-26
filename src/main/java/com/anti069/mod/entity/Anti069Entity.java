@@ -30,6 +30,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * [역할] anti069 — 공포 컨셉 핵심 엔티티. (Mojang 매핑 버전)
@@ -266,6 +267,16 @@ public class Anti069Entity extends Monster {
         });
     }
 
+    /** 가장 가까운 플레이어 반대 방향으로 도망. */
+    private void fleeFromNearestPlayer() {
+        Player near = this.level().getNearestPlayer(this, 16.0);
+        if (near == null) return;
+        Vec3 away = this.position().subtract(near.position());
+        if (away.lengthSqr() < 1.0e-4) away = new Vec3(1, 0, 0);
+        Vec3 dest = this.position().add(away.normalize().scale(10.0));
+        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.5);
+    }
+
     /** 서버 인스턴스를 얻는 도우미. 26.2에선 엔티티에 getServer()가 없어서 ServerLevel 경유. */
     private MinecraftServer server() {
         return this.level() instanceof ServerLevel sl ? sl.getServer() : null;
@@ -322,6 +333,10 @@ public class Anti069Entity extends Monster {
                     idleTalk();
                 }
             }
+            // 죽기 직전(체력 30% 이하)이면 도망
+            if (this.getHealth() <= this.getMaxHealth() * 0.3f && this.tickCount % 20 == 0) {
+                fleeFromNearestPlayer();
+            }
         }
 
         if (phase == Phase.LEFT) {
@@ -336,7 +351,7 @@ public class Anti069Entity extends Monster {
             // 각성 상태에서 30블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
             if (this.tickCount % 10 == 0) {
                 for (Player p : this.level().players()) {
-                    if (p.distanceToSqr(this) <= 30.0 * 30.0) {
+                    if (p.distanceToSqr(this) <= 15.0 * 15.0) {
                         p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 30, 0, false, false));
                     }
                 }

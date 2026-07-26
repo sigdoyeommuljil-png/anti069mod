@@ -13,12 +13,15 @@ import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * [역할] 069_36 — 서버 주인의 클론 NPC. 쿨하고 시크한 성격, 맞으면 좀 화냄.
@@ -39,16 +42,39 @@ public class Neutral06936Entity extends PathfinderMob {
         return Mob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.28)
+                .add(Attributes.ATTACK_DAMAGE, 3.0)
                 .add(Attributes.FOLLOW_RANGE, 24.0);
     }
 
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 0.9));
-        this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
-        // 목표 선정 goal 없음 → 중립
+        // 체력 30% 초과일 때만 맞서 싸움 (그 이하로 떨어지면 도망 로직이 우선)
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.2, true) {
+            @Override public boolean canUse() { return healthRatio() > 0.3f && super.canUse(); }
+            @Override public boolean canContinueToUse() { return healthRatio() > 0.3f && super.canContinueToUse(); }
+        });
+        this.goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this, 0.9));
+        this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+        // 맞으면 때린 상대에게 반격 (체력 30% 초과일 때만)
+        this.targetSelector.addGoal(1, new HurtByTargetGoal(this) {
+            @Override public boolean canUse() { return healthRatio() > 0.3f && super.canUse(); }
+        });
+    }
+
+    private float healthRatio() {
+        return this.getHealth() / this.getMaxHealth();
+    }
+
+    /** 가장 가까운 플레이어 반대 방향으로 도망. */
+    private void fleeFromNearestPlayer() {
+        Player near = this.level().getNearestPlayer(this, 16.0);
+        if (near == null) return;
+        Vec3 away = this.position().subtract(near.position());
+        if (away.lengthSqr() < 1.0e-4) away = new Vec3(1, 0, 0);
+        Vec3 dest = this.position().add(away.normalize().scale(10.0));
+        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.6);
     }
 
     @Override
@@ -56,6 +82,12 @@ public class Neutral06936Entity extends PathfinderMob {
         super.tick();
         if (this.level().isClientSide()) return;
         if (talkCooldown > 0) talkCooldown--;
+
+        // 체력 30% 이하면 도망 (공격 중단하고 튐)
+        if (healthRatio() <= 0.3f && this.tickCount % 20 == 0) {
+            this.setTarget(null);
+            fleeFromNearestPlayer();
+        }
 
         // 근처 플레이어 있으면 5초쯤마다 혼잣말
         if (--idleTimer <= 0) {
