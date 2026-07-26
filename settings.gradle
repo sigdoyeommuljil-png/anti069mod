@@ -1,8 +1,12 @@
-// [역할] 빌드에 필요한 플러그인(특히 fabric-loom)을 어디서 받을지 지정합니다.
 pluginManagement {
-    repositories {
-        maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
-        mavenCentral()
-        gradlePluginPortal()
-    }
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
 }
+
+rootProject.name = 'anti069mod'
