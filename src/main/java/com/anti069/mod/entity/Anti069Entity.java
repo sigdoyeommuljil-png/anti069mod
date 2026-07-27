@@ -23,6 +23,7 @@ import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
+import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.Monster;
@@ -48,6 +49,7 @@ public class Anti069Entity extends Monster {
     private int provokeCount = 0;
     private int hitCount = 0;
     private int leftTimer = 0;
+    private int preLeaveTimer = -1; // 나간 척 하기까지 남은 틱(-1=대기 안함)
     private int growlTimer = 0;
     private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
     private int idleTimer = 100;  // 혼잣말 타이머
@@ -77,7 +79,7 @@ public class Anti069Entity extends Monster {
     public static AttributeSupplier.Builder createAttributes() {
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 120.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.30)
+                .add(Attributes.MOVEMENT_SPEED, 0.33)
                 .add(Attributes.ATTACK_DAMAGE, 8.0)
                 .add(Attributes.FOLLOW_RANGE, 32.0)
                 .add(Attributes.KNOCKBACK_RESISTANCE, 1.0);
@@ -93,8 +95,14 @@ public class Anti069Entity extends Monster {
             @Override public boolean canContinueToUse() { return isAwakened() && super.canContinueToUse(); }
         });
 
+        // [평소에만, 체력 30% 이하] 플레이어에게서 도망
+        this.goalSelector.addGoal(2, new AvoidEntityGoal<>(this, Player.class, 12.0f, 1.4, 1.7) {
+            @Override public boolean canUse() { return !isAwakened() && healthRatio() <= 0.3f && super.canUse(); }
+            @Override public boolean canContinueToUse() { return !isAwakened() && healthRatio() <= 0.3f && super.canContinueToUse(); }
+        });
+
         // [평소에만] 배회
-        this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 0.7) {
+        this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 1.0) {
             @Override public boolean canUse() { return !isAwakened() && super.canUse(); }
         });
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
@@ -163,8 +171,8 @@ public class Anti069Entity extends Monster {
 
         speakAnnoyed(wasHit);
 
-        if ((provokeCount >= 3 || hitCount >= 2) && this.random.nextFloat() < 0.30f) {
-            fakeLeave();
+        if (preLeaveTimer < 0 && (provokeCount >= 3 || hitCount >= 2) && this.random.nextFloat() < 0.30f) {
+            startLeaving();
         }
     }
 
@@ -292,14 +300,8 @@ public class Anti069Entity extends Monster {
         });
     }
 
-    /** 가장 가까운 플레이어 반대 방향으로 도망. */
-    private void fleeFromNearestPlayer() {
-        Player near = this.level().getNearestPlayer(this, 16.0);
-        if (near == null) return;
-        Vec3 away = this.position().subtract(near.position());
-        if (away.lengthSqr() < 1.0e-4) away = new Vec3(1, 0, 0);
-        Vec3 dest = this.position().add(away.normalize().scale(10.0));
-        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.5);
+    private float healthRatio() {
+        return this.getHealth() / this.getMaxHealth();
     }
 
     /** 서버 인스턴스를 얻는 도우미. 26.2에선 엔티티에 getServer()가 없어서 ServerLevel 경유. */
@@ -307,8 +309,29 @@ public class Anti069Entity extends Monster {
         return this.level() instanceof ServerLevel sl ? sl.getServer() : null;
     }
 
-    /** "나간 척": 바닐라와 동일한 노란 퇴장 메시지 + 사라짐. 60초 뒤 각성. */
-    private void fakeLeave() {
+    /** 4초 뜸들인 뒤 나간 척 하도록 예약 + 나가기 전 경고 대사. */
+    private void startLeaving() {
+        preLeaveTimer = 20 * 4; // 4초
+        speakPreLeave();
+    }
+
+    /** 나가기 직전 의미심장한 경고 대사. */
+    private void speakPreLeave() {
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. "
+                + "지금 막 나가버리기 직전, 의미심장하게 경고 한마디 던진다(어떻게 될지 두고 보자는 식). "
+                + "반드시 한국어(한글)로만, 영어 금지. 짧은 반말 한마디. 대사만.";
+        GroqClient.ask("groq_key_hostile.txt", persona, "곧 나갈 것이다.", reply -> {
+            String line = (reply != null && !reply.isEmpty()) ? reply : "흥, 어떻게 될지 두고 보자고.";
+            server.execute(() -> server.getPlayerList().broadcastSystemMessage(
+                    Component.literal("<anti069> " + line), false));
+        });
+    }
+
+    /** 실제 "나간 척": 노란 퇴장 메시지 + 사라짐. 25초 뒤 각성. */
+    private void doFakeLeave() {
+        preLeaveTimer = -1;
         phase = Phase.LEFT;
         leftTimer = 20 * 25; // 25초
         MinecraftServer server = server();
@@ -350,6 +373,12 @@ public class Anti069Entity extends Monster {
 
         if (talkCooldown > 0) talkCooldown--; // 대사 쿨타임 감소
 
+        // 나간 척 예약 카운트다운
+        if (preLeaveTimer > 0) {
+            preLeaveTimer--;
+            if (preLeaveTimer == 0) doFakeLeave();
+        }
+
         if (phase == Phase.PEACEFUL || phase == Phase.WARNING) {
             // 근처에 플레이어 있으면 5초쯤마다 혼잣말
             if (--idleTimer <= 0) {
@@ -357,10 +386,6 @@ public class Anti069Entity extends Monster {
                 if (this.level().getNearestPlayer(this, 24.0) != null) {
                     idleTalk();
                 }
-            }
-            // 죽기 직전(체력 30% 이하)이면 도망
-            if (this.getHealth() <= this.getMaxHealth() * 0.3f && this.tickCount % 20 == 0) {
-                fleeFromNearestPlayer();
             }
         }
 
