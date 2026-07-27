@@ -83,6 +83,8 @@ public class Neutral06936Entity extends PathfinderMob {
         if (this.level().isClientSide()) return;
         if (talkCooldown > 0) talkCooldown--;
 
+        com.anti069.mod.ai.NpcCommands.tick(this); // 명령(따라오기 등) 유지
+
         // 체력 30% 이하면 도망 (공격 중단하고 튐)
         if (healthRatio() <= 0.3f && this.tickCount % 20 == 0) {
             this.setTarget(null);

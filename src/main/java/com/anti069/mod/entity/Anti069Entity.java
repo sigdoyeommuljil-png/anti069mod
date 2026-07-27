@@ -402,6 +402,8 @@ public class Anti069Entity extends Monster {
 
         if (talkCooldown > 0) talkCooldown--; // 대사 쿨타임 감소
 
+        if (!isAwakened()) com.anti069.mod.ai.NpcCommands.tick(this); // 명령(따라오기 등) 유지
+
         // 나간 척 예약 카운트다운
         if (preLeaveTimer > 0) {
             preLeaveTimer--;

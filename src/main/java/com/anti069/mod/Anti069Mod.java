@@ -117,18 +117,22 @@ public class Anti069Mod implements ModInitializer {
             AABB area = sender.getBoundingBox().inflate(TALK_RANGE);
             String playerText = message.decoratedContent().getString();
 
-            // 069_36 (중립 클론) 반응 — 쿨타임/성격은 엔티티가 처리
+            // 069_36 (중립 클론): 명령 분류 → 명령이면 실행, 아니면 대화
             List<Neutral06936Entity> neutrals =
                     level.getEntitiesOfClass(Neutral06936Entity.class, area, e -> true);
             if (!neutrals.isEmpty()) {
-                neutrals.get(0).heardChat(playerText);
+                Neutral06936Entity n = neutrals.get(0);
+                com.anti069.mod.ai.NpcCommands.handle(
+                        n, "groq_key_neutral.txt", sender, playerText, () -> n.heardChat(playerText));
             }
 
-            // anti069 반응 (근처에 있으면 첫 번째가 대답)
+            // anti069: 명령 분류 → 명령이면 실행, 아니면 대화
             List<Anti069Entity> antis =
                     level.getEntitiesOfClass(Anti069Entity.class, area, e -> true);
             if (!antis.isEmpty()) {
-                antis.get(0).heardChat(playerText);
+                Anti069Entity a = antis.get(0);
+                com.anti069.mod.ai.NpcCommands.handle(
+                        a, "groq_key_hostile.txt", sender, playerText, () -> a.heardChat(playerText));
             }
         });
     }
