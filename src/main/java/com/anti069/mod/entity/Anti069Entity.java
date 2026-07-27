@@ -2,7 +2,9 @@ package com.anti069.mod.entity;
 
 import com.anti069.mod.ai.GroqClient;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -16,6 +18,7 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -31,6 +34,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -150,10 +154,13 @@ public class Anti069Entity extends Monster {
 
         // 평범 상태
         if (source.getEntity() instanceof Player player) {
-            // 플레이어에게 죽을 만큼 맞으면 → 죽지 않고 각성
+            // 플레이어에게 죽을 만큼 맞으면 → 죽지 않고 '나간 척' 시작 → 25초 뒤 각성
             if (this.getHealth() - amount <= 0.0f) {
                 this.setHealth(this.getMaxHealth());
-                awaken();
+                if (preLeaveTimer < 0 && phase != Phase.LEFT) {
+                    phase = Phase.WARNING;
+                    startLeaving();
+                }
                 return false;
             }
             boolean result = super.hurtServer(level, source, amount);
@@ -170,10 +177,6 @@ public class Anti069Entity extends Monster {
         phase = Phase.WARNING;
 
         speakAnnoyed(wasHit);
-
-        if (preLeaveTimer < 0 && (provokeCount >= 3 || hitCount >= 2) && this.random.nextFloat() < 0.30f) {
-            startLeaving();
-        }
     }
 
     private void speakAnnoyed(boolean wasHit) {
@@ -304,6 +307,32 @@ public class Anti069Entity extends Monster {
         return this.getHealth() / this.getMaxHealth();
     }
 
+    /** 추격 대상 방향 앞의 블록(발/머리 높이)을 부술 수 있으면 부순다. */
+    private void breakBlocksInFront() {
+        LivingEntity target = this.getTarget();
+        if (target == null) return;
+        Vec3 dir = target.position().subtract(this.position());
+        dir = new Vec3(dir.x, 0, dir.z);
+        if (dir.lengthSqr() < 0.01) return;
+        dir = dir.normalize();
+        BlockPos feet = BlockPos.containing(this.getX() + dir.x, this.getY(), this.getZ() + dir.z);
+        tryBreak(feet);
+        tryBreak(feet.above());
+    }
+
+    /** 흙/풀/나무/잎/유리 계열이면 부순다 (돌·조약돌 등은 안 됨). */
+    private void tryBreak(BlockPos pos) {
+        BlockState st = this.level().getBlockState(pos);
+        if (st.isAir()) return;
+        String id = BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
+        boolean breakable = id.contains("dirt") || id.contains("grass_block")
+                || id.contains("log") || id.contains("planks") || id.contains("wood")
+                || id.contains("leaves") || id.contains("glass");
+        if (breakable) {
+            this.level().destroyBlock(pos, true); // true = 아이템 드롭
+        }
+    }
+
     /** 서버 인스턴스를 얻는 도우미. 26.2에선 엔티티에 getServer()가 없어서 ServerLevel 경유. */
     private MinecraftServer server() {
         return this.level() instanceof ServerLevel sl ? sl.getServer() : null;
@@ -405,6 +434,10 @@ public class Anti069Entity extends Monster {
                         p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 30, 0, false, false));
                     }
                 }
+            }
+            // 추격 중 앞을 막는 흙/나무/잎/유리 부수기 (8틱마다)
+            if (this.tickCount % 8 == 0) {
+                breakBlocksInFront();
             }
         }
     }
