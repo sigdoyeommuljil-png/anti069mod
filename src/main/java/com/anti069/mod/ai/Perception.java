@@ -20,7 +20,7 @@ public class Perception {
         StringBuilder sb = new StringBuilder("[내 주변] ");
 
         // 낮/밤
-        long t = level.dayTime() % 24000L;
+        long t = level.getLevelData().getDayTime() % 24000L;
         boolean night = (t >= 13000 && t < 23000);
         sb.append(night ? "밤" : "낮");
         if (level.isRaining()) sb.append(", 비 옴");
