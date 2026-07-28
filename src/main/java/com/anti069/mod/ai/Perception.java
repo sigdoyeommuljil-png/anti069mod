@@ -20,8 +20,11 @@ public class Perception {
         StringBuilder sb = new StringBuilder("[내 주변] ");
 
         // 낮/밤
-        long t = level.getLevelData().getDayTime() % 24000L;
-        boolean night = (t >= 13000 && t < 23000);
+        // [26.2 변경점] getDayTime() 계열(Level / LevelData / getLevelData 전부)이 사라짐.
+        // 틱 숫자를 직접 계산하지 않고, Level 이 주는 상위 편의 메서드 isNight() 로 판단한다.
+        // 이 메서드는 시간 저장 구조가 바뀌어도 잘 안 깨지고, 네더/엔드(시간 고정 차원)에서는
+        // 항상 false(=낮 취급)를 돌려준다.
+        boolean night = level.isNight();
         sb.append(night ? "밤" : "낮");
         if (level.isRaining()) sb.append(", 비 옴");
 
