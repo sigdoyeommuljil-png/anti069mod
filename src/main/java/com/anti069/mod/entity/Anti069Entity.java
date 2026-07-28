@@ -56,6 +56,7 @@ public class Anti069Entity extends Monster {
     private int preLeaveTimer = -1; // 나간 척 하기까지 남은 틱(-1=대기 안함)
     private int growlTimer = 0;
     private int chantTimer = 0;   // 각성 배경음(chant) 재생 간격 카운트. 0 이하가 되면 다시 재생
+    private int watchTimer = 0;   // 각성 중 "지켜보고있다" 협박 대사 도배 간격 카운트
     private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
     private int idleTimer = 100;  // 혼잣말 타이머
 
@@ -338,14 +339,22 @@ public class Anti069Entity extends Monster {
         tryBreak(feet.above());
     }
 
-    /** 흙/풀/나무/잎/유리 계열이면 부순다 (돌·조약돌 등은 안 됨). */
+    /** 흙/풀/나무 계열/잎/유리 + '그냥 돌'이면 부순다 (조약돌·사암·블랙스톤 등 다른 돌은 안 됨). */
     private void tryBreak(BlockPos pos) {
         BlockState st = this.level().getBlockState(pos);
         if (st.isAir()) return;
         String id = BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
-        boolean breakable = id.contains("dirt") || id.contains("grass_block")
-                || id.contains("log") || id.contains("planks") || id.contains("wood")
-                || id.contains("leaves") || id.contains("glass");
+
+        // '그냥 돌'은 정확히 minecraft:stone 일 때만. contains("stone") 으로 하면
+        // cobblestone/sandstone/redstone/blackstone/end_stone 까지 걸려서 안 됨.
+        boolean plainStone = id.equals("minecraft:stone");
+        // 나무 계열(원목/판자/나무/줄기/잎)
+        boolean woodFamily = id.contains("log") || id.contains("planks")
+                || id.contains("wood") || id.contains("leaves") || id.contains("stem");
+        // 흙·풀·유리
+        boolean soft = id.contains("dirt") || id.contains("grass_block") || id.contains("glass");
+
+        boolean breakable = plainStone || woodFamily || soft;
         if (breakable) {
             this.level().destroyBlock(pos, true); // true = 아이템 드롭
         }
@@ -422,6 +431,17 @@ public class Anti069Entity extends Monster {
     /** chant(각성 배경음)의 대략적 길이(틱). 43초 ≈ 860틱. 이 간격마다 다시 재생한다. */
     private static final int CHANT_TICKS = 860;
 
+    /** 각성 중 도배할 협박 대사 후보들. 대부분 "지켜보고있다" 계열. */
+    private static final String[] WATCH_LINES = {
+            "지켜보고있다",
+            "지켜보고있다...",
+            "지켜보고있다 지켜보고있다",
+            "어디 숨어도 다 보여",
+            "도망칠 수 없어",
+            "가까워지고 있어",
+            "널 보고 있어"
+    };
+
     @Override
     public void tick() {
         super.tick();
@@ -461,6 +481,16 @@ public class Anti069Entity extends Monster {
                 chantTimer = CHANT_TICKS;
                 this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
                         ModSounds.AWAKEN_CHANT, SoundSource.HOSTILE, 0.6f, 1.0f);
+            }
+            // "지켜보고있다" 협박 대사 도배: 40틱(2초)마다 무작위 한 줄을 전체 채팅에 뿌린다.
+            if (--watchTimer <= 0) {
+                watchTimer = 40;
+                MinecraftServer sv = server();
+                if (sv != null) {
+                    String line = WATCH_LINES[this.random.nextInt(WATCH_LINES.length)];
+                    sv.getPlayerList().broadcastSystemMessage(
+                            Component.literal("<anti069> " + line), false);
+                }
             }
             // 각성 상태에서 30블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
             if (this.tickCount % 10 == 0) {

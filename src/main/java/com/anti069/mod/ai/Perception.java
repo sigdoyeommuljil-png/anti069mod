@@ -20,11 +20,14 @@ public class Perception {
         StringBuilder sb = new StringBuilder("[내 주변] ");
 
         // 낮/밤
-        // [26.2 변경점] getDayTime() 계열(Level / LevelData / getLevelData 전부)이 사라짐.
-        // 틱 숫자를 직접 계산하지 않고, Level 이 주는 상위 편의 메서드 isNight() 로 판단한다.
-        // 이 메서드는 시간 저장 구조가 바뀌어도 잘 안 깨지고, 네더/엔드(시간 고정 차원)에서는
-        // 항상 false(=낮 취급)를 돌려준다.
-        boolean night = level.isNight();
+        // [26.2 변경점] getDayTime() 계열도, isNight()/isDay() 도 전부 사라짐.
+        // 이름 바뀔 위험 있는 시간 메서드 대신, 아주 오래 유지돼온 getGameTime()(월드 총 경과 틱)을 쓴다.
+        // getGameTime() 은 스케줄링 등 곳곳에서 쓰여 거의 안 바뀌는 안전한 메서드다.
+        // 24000틱(하루)으로 나눈 나머지가 13000~23000 이면 밤으로 본다.
+        // 주의: 이 값은 실제 '하루 시간'이 아니라 월드 나이라, 누가 자거나 /time set 하면
+        //       실제 낮/밤과 어긋날 수 있다(상황 묘사용 대략값).
+        long t = level.getGameTime() % 24000L;
+        boolean night = (t >= 13000L && t < 23000L);
         sb.append(night ? "밤" : "낮");
         if (level.isRaining()) sb.append(", 비 옴");
 
