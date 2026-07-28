@@ -2,6 +2,7 @@ package com.anti069.mod.entity;
 
 import com.anti069.mod.ai.GroqClient;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -27,7 +28,7 @@ import net.minecraft.world.phys.Vec3;
  * [역할] 069_36 — 서버 주인의 클론 NPC. 쿨하고 시크한 성격, 맞으면 좀 화냄.
  * anti069 가 가진 기본 기능(대사 쿨타임 + 인벤토리 + 죽음 반응)을 동일하게 가짐.
  */
-public class Neutral06936Entity extends PathfinderMob {
+public class Neutral06936Entity extends PathfinderMob implements NpcInventoryHolder {
 
     private int talkCooldown = 0;  // 20틱=1초
     private int idleTimer = 100;   // 혼잣말 타이머
@@ -109,7 +110,7 @@ public class Neutral06936Entity extends PathfinderMob {
         String persona = personaBase()
                 + "지금 월드를 둘러보며 혼잣말을 한다. 자아가 있는 것처럼, 방금 든 생각이나 관찰을 자연스럽게. "
                 + "반드시 한국어(한글)로만, 영어 절대 금지. 짧은 반말 한마디. 대사만.";
-        askAndSay(server, persona, com.anti069.mod.ai.Perception.describe(this) + " 이 상황에서 혼잣말을 한다.", "흐음.");
+        askAndSay(server, persona, com.anti069.mod.ai.Perception.describe(this) + " 이 상황에서 혼잣말을 한다.", "흐음.", true);
     }
 
     /** 맞으면 좀 화냄 (대사가 점점 세짐). */
@@ -137,7 +138,7 @@ public class Neutral06936Entity extends PathfinderMob {
                 + " 반드시 한국어(한글)로만, 영어 절대 섞지 말고 짧게 답하라. 대사만.";
         String situation = com.anti069.mod.ai.Perception.describe(this)
                 + " 플레이어가 너에게 말했다: \"" + playerText + "\"";
-        askAndSay(server, persona, situation, "...뭐.");
+        askAndSay(server, persona, situation, "...뭐.", false);
     }
 
     private void speakHurt() {
@@ -147,7 +148,7 @@ public class Neutral06936Entity extends PathfinderMob {
         if (server == null) return;
         String persona = personaBase() + "방금 플레이어한테 맞았다. 살짝 화내라. "
                 + "반드시 한국어(한글)로만, 영어 섞지 말고 짧은 반말 한마디. 대사만.";
-        askAndSay(server, persona, "플레이어가 나를 때렸다. (누적 " + annoyed + "회)", "아, 왜 때려.");
+        askAndSay(server, persona, "플레이어가 나를 때렸다. (누적 " + annoyed + "회)", "아, 왜 때려.", false);
     }
 
     /** 069_36 공통 성격 설명. */
@@ -173,6 +174,7 @@ public class Neutral06936Entity extends PathfinderMob {
             dropInventory();
             announceDeath();
             speakDying();
+            com.anti069.mod.ai.NpcTalk.deathSeen(this, "069_36");
         }
         if (this.level() instanceof ServerLevel sl) {
             com.anti069.mod.Anti069Mod.scheduleRespawn(sl, this.getX(), this.getY(), this.getZ(), ModEntities.NEUTRAL06936);
@@ -202,17 +204,57 @@ public class Neutral06936Entity extends PathfinderMob {
         if (server == null) return;
         String persona = personaBase() + "방금 죽었다. "
                 + "반드시 한국어(한글)로만, 영어 섞지 말고 쿨하게 짧은 반말 한마디 남겨라. 대사만.";
-        askAndSay(server, persona, "나는 방금 죽었다.", "쳇, 이렇게 가네.");
+        askAndSay(server, persona, "나는 방금 죽었다.", "쳇, 이렇게 가네.", false);
     }
 
-    /** Groq 호출 + 실패 시 기본 대사, 서버 스레드에서 채팅 출력. */
-    private void askAndSay(MinecraftServer server, String persona, String situation, String fallback) {
+    /** Groq 호출 + 실패 시 기본 대사, 서버 스레드에서 채팅 출력.
+     *  chainNpc=true 이면 이 말도 NPC끼리 대화의 일부로 처리(상대가 반응할 수 있게). */
+    private void askAndSay(MinecraftServer server, String persona, String situation,
+                           String fallback, boolean chainNpc) {
         GroqClient.ask("groq_key_neutral.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : fallback;
-            server.execute(() ->
-                    server.getPlayerList().broadcastSystemMessage(
-                            Component.literal("<069_36> " + line), false));
+            server.execute(() -> {
+                server.getPlayerList().broadcastSystemMessage(
+                        Component.literal("<069_36> " + line), false);
+                if (chainNpc) com.anti069.mod.ai.NpcTalk.lineSpoken(this, "069_36", line);
+            });
         });
+    }
+
+    /**
+     * [인터페이스 구현] 인벤에서 지정 아이템 1칸을 꺼내 반환(없으면 빈 스택).
+     * 레지스트리 '이름 문자열'로 비교 → 26.2 아이템 조회 API 변경에 안 걸린다.
+     */
+    @Override
+    public ItemStack takeItemByName(String itemId) {
+        for (int i = 0; i < inventory.size(); i++) {
+            ItemStack s = inventory.get(i);
+            if (s.isEmpty()) continue;
+            String key = BuiltInRegistries.ITEM.getKey(s.getItem()).toString();
+            if (key.equals("minecraft:" + itemId) || key.endsWith(":" + itemId)) {
+                inventory.set(i, ItemStack.EMPTY);
+                return s;
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** [NPC끼리 대화] 다른 NPC의 말/죽음에 쿨하게 한마디 반응한다. NpcTalk 가 호출. */
+    public void reactToNpc(String otherTag, String otherLine, boolean death) {
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+        String persona = personaBase()
+                + (death
+                    ? ("다른 NPC '" + otherTag + "'가 방금 죽었다. 여기에 쿨하게 한마디 반응하라. ")
+                    : ("다른 NPC '" + otherTag + "'가 \"" + otherLine + "\"라고 말했다. 여기에 쿨하게 대꾸하라. "))
+                + "반드시 한국어(한글)로만, 영어 금지, 짧은 반말 한마디. 대사만.";
+        String situation = death
+                ? ("'" + otherTag + "'가 죽었다.")
+                : ("'" + otherTag + "'의 말: \"" + otherLine + "\"");
+        // 이 반응도 대화의 일부 → chainNpc=true 로 상대가 또 반응할 수 있게(3턴 제한은 NpcTalk 관리)
+        askAndSay(server, persona, situation, death ? "...갔군." : "...그래서?", true);
     }
 
     private MinecraftServer server() {

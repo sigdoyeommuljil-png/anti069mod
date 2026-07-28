@@ -41,7 +41,7 @@ import net.minecraft.world.phys.Vec3;
  * [역할] anti069 — 공포 컨셉 핵심 엔티티. (Mojang 매핑 버전)
  * PEACEFUL → WARNING → LEFT → AWAKENED 4단계로 진행됩니다.
  */
-public class Anti069Entity extends Monster {
+public class Anti069Entity extends Monster implements NpcInventoryHolder {
 
     private enum Phase { PEACEFUL, WARNING, LEFT, AWAKENED }
 
@@ -249,6 +249,55 @@ public class Anti069Entity extends Monster {
         return false; // 인벤 가득 참
     }
 
+    /**
+     * [인터페이스 구현] 인벤에서 지정 아이템 1칸을 꺼내 반환(없으면 빈 스택).
+     * 레지스트리 '이름 문자열'로 비교 → 26.2에서 아이템 조회 API가 바뀌어도 안 걸린다.
+     */
+    @Override
+    public ItemStack takeItemByName(String itemId) {
+        for (int i = 0; i < inventory.size(); i++) {
+            ItemStack s = inventory.get(i);
+            if (s.isEmpty()) continue;
+            String key = BuiltInRegistries.ITEM.getKey(s.getItem()).toString();
+            if (key.equals("minecraft:" + itemId) || key.endsWith(":" + itemId)) {
+                inventory.set(i, ItemStack.EMPTY);
+                return s;
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /**
+     * [NPC끼리 대화] 다른 NPC의 말/죽음에 한마디 반응한다. NpcTalk 가 호출.
+     * 각성/퇴장 단계에선 태연한 대화를 안 하므로 무시한다.
+     */
+    public void reactToNpc(String otherTag, String otherLine, boolean death) {
+        if (phase == Phase.LEFT || phase == Phase.AWAKENED) return;
+        if (talkCooldown > 0) return;
+        talkCooldown = 20;
+        final MinecraftServer server = server();
+        if (server == null) return;
+
+        String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. "
+                + (death
+                    ? ("다른 NPC '" + otherTag + "'가 방금 죽었다. 여기에 까칠하게 한마디 하라. ")
+                    : ("다른 NPC '" + otherTag + "'가 \"" + otherLine + "\"라고 말했다. 여기에 까칠하게 대꾸하라. "))
+                + "반드시 한국어(한글)로만, 영어 절대 금지. 짧은 반말 한마디. 대사만.";
+        String situation = death
+                ? ("'" + otherTag + "'가 죽었다.")
+                : ("'" + otherTag + "'의 말: \"" + otherLine + "\"");
+
+        GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
+            String line = (reply != null && !reply.isEmpty()) ? reply : (death ? "...갔네." : "...그래서?");
+            server.execute(() -> {
+                server.getPlayerList().broadcastSystemMessage(
+                        Component.literal("<anti069> " + line), false);
+                // 내 대꾸도 대화의 일부 → 상대가 또 반응할 수 있게 알림(3턴 제한은 NpcTalk가 관리)
+                com.anti069.mod.ai.NpcTalk.lineSpoken(this, "anti069", line);
+            });
+        });
+    }
+
     /** 죽을 때 호출. 각성 전(평범)일 때만 반응 + 인벤 떨구기. */
     @Override
     public void die(DamageSource source) {
@@ -263,6 +312,8 @@ public class Anti069Entity extends Monster {
             dropInventory();
             announceDeath();
             speakDying();
+            // 근처 다른 NPC가 이 죽음에 한 번 반응
+            com.anti069.mod.ai.NpcTalk.deathSeen(this, "anti069");
         }
         if (this.level() instanceof ServerLevel sl) {
             com.anti069.mod.Anti069Mod.scheduleRespawn(sl, this.getX(), this.getY(), this.getZ(), ModEntities.ANTI069);
@@ -316,9 +367,11 @@ public class Anti069Entity extends Monster {
         GroqClient.ask("groq_key_hostile.txt", persona,
                 com.anti069.mod.ai.Perception.describe(this) + " 이 상황에서 혼잣말을 한다.", reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : "...심심하네.";
-            server.execute(() ->
-                    server.getPlayerList().broadcastSystemMessage(
-                            Component.literal("<anti069> " + line), false));
+            server.execute(() -> {
+                server.getPlayerList().broadcastSystemMessage(
+                        Component.literal("<anti069> " + line), false);
+                com.anti069.mod.ai.NpcTalk.lineSpoken(this, "anti069", line);
+            });
         });
     }
 
