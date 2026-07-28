@@ -55,6 +55,7 @@ public class Anti069Entity extends Monster {
     private int leftTimer = 0;
     private int preLeaveTimer = -1; // 나간 척 하기까지 남은 틱(-1=대기 안함)
     private int growlTimer = 0;
+    private int chantTimer = 0;   // 각성 배경음(chant) 재생 간격 카운트. 0 이하가 되면 다시 재생
     private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
     private int idleTimer = 100;  // 혼잣말 타이머
 
@@ -146,10 +147,13 @@ public class Anti069Entity extends Monster {
                     // 확실히 죽임(각성 무적 무시) → die()에서 리스폰 예약 = 정상화
                     return super.hurtServer(level, level.damageSources().genericKill(), Float.MAX_VALUE);
                 }
+                // 관통 데미지를 실제로 받았으니 피격음 재생
+                this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        ModSounds.HURT_BOX_CRASH, SoundSource.HOSTILE, 0.9f, 1.0f);
                 this.setHealth(nh);
                 return true;
             }
-            return false; // 그 외 데미지 무시(무적)
+            return false; // 그 외 데미지 무시(무적) → 소리 없음
         }
 
         // 평범 상태
@@ -164,6 +168,11 @@ public class Anti069Entity extends Monster {
                 return false;
             }
             boolean result = super.hurtServer(level, source, amount);
+            if (result) {
+                // 실제로 피해가 들어갔을 때만 피격음 재생(막히거나 무효면 소리 없음)
+                this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        ModSounds.HURT_BOX_CRASH, SoundSource.HOSTILE, 0.9f, 1.0f);
+            }
             onProvoked(player, true);
             return result;
         }
@@ -242,6 +251,13 @@ public class Anti069Entity extends Monster {
     /** 죽을 때 호출. 각성 전(평범)일 때만 반응 + 인벤 떨구기. */
     @Override
     public void die(DamageSource source) {
+        // 죽는 순간 car crash 재생. die()는 실제 사망 때만 호출되므로(평범 상태의
+        // '나간 척'은 여기 안 옴) 한 번만 울린다. 볼륨 1.0으로 크게.
+        // 서버에서만 재생 → 서버가 모든 클라이언트에 한 번씩 뿌림(양쪽 재생 시 중복 방지).
+        if (!this.level().isClientSide()) {
+            this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                    ModSounds.DEATH_CAR_CRASH, SoundSource.HOSTILE, 1.0f, 1.0f);
+        }
         if (!this.level().isClientSide() && phase != Phase.AWAKENED) {
             dropInventory();
             announceDeath();
@@ -395,7 +411,16 @@ public class Anti069Entity extends Monster {
 
         this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
                 ModSounds.AWAKEN_ROAR, SoundSource.HOSTILE, 0.8f, 1.0f);
+
+        // 각성 배경음(chant) 첫 재생 + 반복 타이머 설정.
+        // CHANT_TICKS(=chant 길이) 마다 tick()에서 다시 재생시켜 무한 반복처럼 만든다.
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                ModSounds.AWAKEN_CHANT, SoundSource.HOSTILE, 0.6f, 1.0f);
+        chantTimer = CHANT_TICKS;
     }
+
+    /** chant(각성 배경음)의 대략적 길이(틱). 43초 ≈ 860틱. 이 간격마다 다시 재생한다. */
+    private static final int CHANT_TICKS = 860;
 
     @Override
     public void tick() {
@@ -430,6 +455,12 @@ public class Anti069Entity extends Monster {
                 growlTimer = 60 + this.random.nextInt(80);
                 this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
                         ModSounds.HUNT_GROWL, SoundSource.HOSTILE, 0.5f, 1.0f);
+            }
+            // 각성 배경음(chant) 무한 반복: 길이만큼 지나면 현재 위치에서 다시 재생
+            if (--chantTimer <= 0) {
+                chantTimer = CHANT_TICKS;
+                this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        ModSounds.AWAKEN_CHANT, SoundSource.HOSTILE, 0.6f, 1.0f);
             }
             // 각성 상태에서 30블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
             if (this.tickCount % 10 == 0) {

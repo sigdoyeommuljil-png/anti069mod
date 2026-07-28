@@ -13,6 +13,9 @@ public class ModSounds {
 
     public static final SoundEvent AWAKEN_ROAR = register("awaken_roar");
     public static final SoundEvent HUNT_GROWL = register("hunt_growl");
+    public static final SoundEvent AWAKEN_CHANT = register("awaken_chant");     // 각성 배경음(무한 반복)
+    public static final SoundEvent DEATH_CAR_CRASH = register("death_car_crash"); // 사망음
+    public static final SoundEvent HURT_BOX_CRASH = register("hurt_box_crash");   // 피격음
 
     private static SoundEvent register(String name) {
         Identifier id = Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, name);
