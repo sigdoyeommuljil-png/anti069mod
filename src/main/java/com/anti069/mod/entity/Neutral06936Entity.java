@@ -109,7 +109,7 @@ public class Neutral06936Entity extends PathfinderMob {
         String persona = personaBase()
                 + "지금 월드를 둘러보며 혼잣말을 한다. 자아가 있는 것처럼, 방금 든 생각이나 관찰을 자연스럽게. "
                 + "반드시 한국어(한글)로만, 영어 절대 금지. 짧은 반말 한마디. 대사만.";
-        askAndSay(server, persona, "혼잣말을 한다.", "흐음.");
+        askAndSay(server, persona, com.anti069.mod.ai.Perception.describe(this) + " 이 상황에서 혼잣말을 한다.", "흐음.");
     }
 
     /** 맞으면 좀 화냄 (대사가 점점 세짐). */
@@ -135,7 +135,8 @@ public class Neutral06936Entity extends PathfinderMob {
                 : "방금 맞아서 좀 화가 나 있다.";
         String persona = personaBase() + mood
                 + " 반드시 한국어(한글)로만, 영어 절대 섞지 말고 짧게 답하라. 대사만.";
-        String situation = "플레이어가 너에게 말했다: \"" + playerText + "\"";
+        String situation = com.anti069.mod.ai.Perception.describe(this)
+                + " 플레이어가 너에게 말했다: \"" + playerText + "\"";
         askAndSay(server, persona, situation, "...뭐.");
     }
 

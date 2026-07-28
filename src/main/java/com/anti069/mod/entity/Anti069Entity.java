@@ -217,7 +217,8 @@ public class Anti069Entity extends Monster {
                 : "너는 이미 좀 짜증이 나 있다 (누적 도발 " + provokeCount + "회).";
         String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. " + mood
                 + " 반드시 한국어(한글)로만 말하고 영어는 절대 섞지 마라. 짧은 반말 한 문장으로 대답하라. 대사만.";
-        String situation = "플레이어가 너에게 말했다: \"" + playerText + "\"";
+        String situation = com.anti069.mod.ai.Perception.describe(this)
+                + " 플레이어가 너에게 말했다: \"" + playerText + "\"";
 
         GroqClient.ask("groq_key_hostile.txt", persona, situation, reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : "...왜?";
@@ -295,7 +296,8 @@ public class Anti069Entity extends Monster {
         String persona = "너는 마인크래프트 서버의 평범한 플레이어 'anti069'인 척하는 존재다. 성격이 까칠하다. "
                 + "지금 월드를 둘러보며 혼잣말을 한다. 자아가 있는 것처럼, 방금 든 생각이나 관찰을 자연스럽게. "
                 + "반드시 한국어(한글)로만, 영어 절대 금지. 짧은 반말 한마디. 대사만.";
-        GroqClient.ask("groq_key_hostile.txt", persona, "혼잣말을 한다.", reply -> {
+        GroqClient.ask("groq_key_hostile.txt", persona,
+                com.anti069.mod.ai.Perception.describe(this) + " 이 상황에서 혼잣말을 한다.", reply -> {
             String line = (reply != null && !reply.isEmpty()) ? reply : "...심심하네.";
             server.execute(() ->
                     server.getPlayerList().broadcastSystemMessage(
