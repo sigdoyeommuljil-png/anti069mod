@@ -2,6 +2,7 @@ package com.anti069.mod.ai;
 
 import com.anti069.mod.entity.Anti069Entity;
 import com.anti069.mod.entity.Neutral06936Entity;
+import com.anti069.mod.entity.Seojune5Entity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.phys.AABB;
 
@@ -73,6 +74,8 @@ public class NpcTalk {
             a.reactToNpc(otherTag, otherLine, death);
         } else if (reactor instanceof Neutral06936Entity n) {
             n.reactToNpc(otherTag, otherLine, death);
+        } else if (reactor instanceof Seojune5Entity s) {
+            s.reactToNpc(otherTag, otherLine, death);
         }
     }
 
@@ -81,7 +84,8 @@ public class NpcTalk {
         AABB box = speaker.getBoundingBox().inflate(RANGE);
         List<PathfinderMob> list = speaker.level().getEntitiesOfClass(PathfinderMob.class, box,
                 e -> e != speaker && e.isAlive()
-                        && (e instanceof Anti069Entity || e instanceof Neutral06936Entity));
+                        && (e instanceof Anti069Entity || e instanceof Neutral06936Entity
+                            || e instanceof Seojune5Entity));
         PathfinderMob best = null;
         double bestD = Double.MAX_VALUE;
         for (PathfinderMob e : list) {

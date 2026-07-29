@@ -134,6 +134,15 @@ public class Anti069Mod implements ModInitializer {
                 com.anti069.mod.ai.NpcCommands.handle(
                         a, "groq_key_hostile.txt", sender, playerText, () -> a.heardChat(playerText));
             }
+
+            // 5seojune (겁쟁이): 명령 분류 → 명령이면 실행, 아니면 대화 (중립 키 재활용)
+            List<com.anti069.mod.entity.Seojune5Entity> seojunes =
+                    level.getEntitiesOfClass(com.anti069.mod.entity.Seojune5Entity.class, area, e -> true);
+            if (!seojunes.isEmpty()) {
+                com.anti069.mod.entity.Seojune5Entity s = seojunes.get(0);
+                com.anti069.mod.ai.NpcCommands.handle(
+                        s, "groq_key_neutral.txt", sender, playerText, () -> s.heardChat(playerText));
+            }
         });
     }
 

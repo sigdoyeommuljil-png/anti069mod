@@ -40,6 +40,18 @@ public class ModEntities {
                     .build(NEUTRAL06936_KEY)
     );
 
+    public static final ResourceKey<EntityType<?>> SEOJUNE5_KEY =
+            ResourceKey.create(Registries.ENTITY_TYPE,
+                    Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, "5seojune"));
+
+    public static final EntityType<Seojune5Entity> SEOJUNE5 = register(
+            SEOJUNE5_KEY,
+            EntityType.Builder.of(Seojune5Entity::new, MobCategory.CREATURE)
+                    .sized(0.6f, 1.95f)
+                    .clientTrackingRange(8)
+                    .build(SEOJUNE5_KEY)
+    );
+
     private static <T extends Entity> EntityType<T> register(
             ResourceKey<EntityType<?>> key, EntityType<T> type) {
         return Registry.register(BuiltInRegistries.ENTITY_TYPE, key, type);
@@ -48,6 +60,7 @@ public class ModEntities {
     public static void registerModEntities() {
         FabricDefaultAttributeRegistry.register(ANTI069, Anti069Entity.createAttributes());
         FabricDefaultAttributeRegistry.register(NEUTRAL06936, Neutral06936Entity.createAttributes());
-        Anti069Mod.LOGGER.info("[{}] 엔티티 2종 등록 완료", Anti069Mod.MOD_ID);
+        FabricDefaultAttributeRegistry.register(SEOJUNE5, Seojune5Entity.createAttributes());
+        Anti069Mod.LOGGER.info("[{}] 엔티티 3종 등록 완료", Anti069Mod.MOD_ID);
     }
 }

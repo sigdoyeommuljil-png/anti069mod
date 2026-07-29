@@ -20,6 +20,7 @@ public class Anti069ModClient implements ClientModInitializer {
     public void onInitializeClient() {
         EntityRendererRegistry.register(ModEntities.ANTI069, Anti069Renderer::new);
         EntityRendererRegistry.register(ModEntities.NEUTRAL06936, Neutral06936Renderer::new);
+        EntityRendererRegistry.register(ModEntities.SEOJUNE5, com.anti069.mod.client.Seojune5Renderer::new);
 
         // 블러드문: 각성 anti069 가 근처면 화면을 붉게. HUD 요소로 매 프레임 그린다.
         // context(그리기 도구)의 타입은 컴파일러가 추론하므로 이름을 적지 않는다 → 26.2 개명에 안 걸림.

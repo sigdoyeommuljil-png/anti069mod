@@ -2,6 +2,7 @@ package com.anti069.mod.client;
 
 import com.anti069.mod.entity.Anti069Entity;
 import com.anti069.mod.entity.Neutral06936Entity;
+import com.anti069.mod.entity.Seojune5Entity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
@@ -34,10 +35,12 @@ public final class FakeTab {
 
         AABB box = mc.player.getBoundingBox().inflate(RANGE);
         List<Entity> ents = mc.level.getEntitiesOfClass(Entity.class, box,
-                e -> e instanceof Anti069Entity || e instanceof Neutral06936Entity);
+                e -> e instanceof Anti069Entity || e instanceof Neutral06936Entity
+                        || e instanceof Seojune5Entity);
         for (Entity e : ents) {
             // anti069 는 '평범한 플레이어인 척'하는 컨셉이라 이 이름이 그대로 뜨는 게 속임수가 된다.
             if (e instanceof Anti069Entity) out.add("anti069");
+            else if (e instanceof Seojune5Entity) out.add("5seojune");
             else out.add("069_36");
         }
         return out;
