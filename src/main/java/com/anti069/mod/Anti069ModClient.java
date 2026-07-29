@@ -52,8 +52,8 @@ public class Anti069ModClient implements ClientModInitializer {
                         int x = (screenW - tw) / 2; // 가로 가운데 정렬
                         // 탭 목록처럼 반투명 검은 배경(좌우로 살짝 여유)
                         context.fill(x - 2, y - 1, x + tw + 2, y + 9, 0x80000000);
-                        // 흰 글자 + 그림자. 26.x에서 이 메서드 이름은 drawText.
-                        context.drawText(mc.font, name, x, y, 0xFFFFFFFF, true);
+                        // 흰 글자 + 그림자. 26.x GuiGraphicsExtractor 의 글자 메서드는 text(폰트,글자,x,y,색,그림자).
+                        context.text(mc.font, name, x, y, 0xFFFFFFFF, true);
                         y += rowH;
                     }
                 });
