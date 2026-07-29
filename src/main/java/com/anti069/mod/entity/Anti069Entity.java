@@ -88,7 +88,10 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
                 .add(Attributes.MOVEMENT_SPEED, 0.33)
                 .add(Attributes.ATTACK_DAMAGE, 8.0)
                 .add(Attributes.FOLLOW_RANGE, 32.0)
-                .add(Attributes.KNOCKBACK_RESISTANCE, 1.0);
+                .add(Attributes.KNOCKBACK_RESISTANCE, 1.0)
+                // 로케이터바 표시: 이 값(블록)만큼 떨어진 플레이어에게 위치가 점으로 전송된다.
+                // LivingEntity 는 이미 WaypointTransmitter 라, 이 속성만 0보다 크면 로케이터바에 뜬다.
+                .add(Attributes.WAYPOINT_TRANSMIT_RANGE, 512.0);
     }
 
     @Override

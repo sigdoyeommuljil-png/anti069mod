@@ -44,7 +44,9 @@ public class Neutral06936Entity extends PathfinderMob implements NpcInventoryHol
                 .add(Attributes.MAX_HEALTH, 20.0)
                 .add(Attributes.MOVEMENT_SPEED, 0.28)
                 .add(Attributes.ATTACK_DAMAGE, 3.0)
-                .add(Attributes.FOLLOW_RANGE, 24.0);
+                .add(Attributes.FOLLOW_RANGE, 24.0)
+                // 로케이터바 표시(자세한 설명은 anti069 쪽 참고)
+                .add(Attributes.WAYPOINT_TRANSMIT_RANGE, 512.0);
     }
 
     @Override
