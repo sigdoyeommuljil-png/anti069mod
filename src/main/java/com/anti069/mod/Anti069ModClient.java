@@ -35,8 +35,8 @@ public class Anti069ModClient implements ClientModInitializer {
                     context.fill(0, 0, w, h, color);
                 });
 
-        // Tab 눈속임: Tab 을 누르고 있을 때, 근처 NPC 이름을 화면에 접속자처럼 그린다.
-        // 서버 패킷 없이 클라이언트에서 글자만 그리는 방식. drawString(폰트, 글자, x, y, 색, 그림자).
+        // Tab 눈속임: Tab 을 누르고 있을 때, 근처 NPC 이름을 실제 접속자 목록처럼 그린다.
+        // 화면 상단 가운데 정렬 + 반투명 검은 배경(탭 목록과 같은 모양). 서버 패킷 없이 클라에서만 그림.
         HudElementRegistry.addLast(
                 Identifier.fromNamespaceAndPath("anti069mod", "fake_tab"),
                 (context, tickCounter) -> {
@@ -44,10 +44,17 @@ public class Anti069ModClient implements ClientModInitializer {
                     if (!mc.options.keyPlayerList.isDown()) return; // Tab 안 누르면 안 그림
                     java.util.List<String> names = FakeTab.npcNames();
                     if (names.isEmpty()) return;
-                    int y = 30; // 실제 탭 목록 근처 위쪽. 위치/정렬은 나중에 조절 가능.
+                    int screenW = mc.getWindow().getGuiScaledWidth();
+                    int rowH = 11;
+                    int y = 10; // 화면 맨 위에서 살짝 아래(실제 탭 목록 위치)
                     for (String name : names) {
-                        context.drawString(mc.font, name, 10, y, 0xFFFFFFFF, false);
-                        y += 10;
+                        int tw = mc.font.width(name);
+                        int x = (screenW - tw) / 2; // 가로 가운데 정렬
+                        // 탭 목록처럼 반투명 검은 배경(좌우로 살짝 여유)
+                        context.fill(x - 2, y - 1, x + tw + 2, y + 9, 0x80000000);
+                        // 흰 글자(그림자 여부 인자 없는 5개짜리 버전)
+                        context.drawString(mc.font, name, x, y, 0xFFFFFFFF);
+                        y += rowH;
                     }
                 });
     }
