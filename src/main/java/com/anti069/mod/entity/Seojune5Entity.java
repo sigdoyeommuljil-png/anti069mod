@@ -8,6 +8,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -79,6 +81,9 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
         com.anti069.mod.ai.NpcCommands.tick(this); // 명령(따라오기 등) 유지
 
+        // '히든 캐릭터' 떡칠 오라: 2초마다 화려한 효과들을 다시 발라 파티클이 끊기지 않게 한다.
+        if (this.tickCount % 40 == 0) applyHiddenAura();
+
         // 겁먹은 동안은 계속 도망
         if (panicTimer > 0) {
             panicTimer--;
@@ -130,6 +135,24 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         }
     }
 
+    /**
+     * '히든 캐릭터' 떡칠 오라: 온몸에 화려한 효과를 잔뜩 발라 색색깔 파티클이 소용돌이치게 한다.
+     * 전부 시각/버프 효과라 대사(Groq)를 안 써서 API 제한과 무관하다.
+     * 26.x 에서 이름이 안 바뀐 효과들만 골라 씀(발광·재생·화염저항·수중호흡·흡수·야간투시·체력증가·행운).
+     * 마지막 인자 true = 파티클 보이기.
+     */
+    private void applyHiddenAura() {
+        int d = 100; // 5초 지속(2초마다 갱신하므로 안 끊김)
+        this.addEffect(new MobEffectInstance(MobEffects.GLOWING, d, 0, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.REGENERATION, d, 0, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, d, 0, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, d, 0, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, d, 3, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, d, 0, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.HEALTH_BOOST, d, 3, false, true));
+        this.addEffect(new MobEffectInstance(MobEffects.LUCK, d, 0, false, true));
+    }
+
     /** 자아 있는 느낌의 혼잣말 (허둥대며). */
     private void idleTalk() {
         if (talkCooldown > 0) return;
@@ -170,8 +193,9 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
     /** 5seojune 공통 성격 설명. */
     private String personaBase() {
-        return "너는 마인크래프트 서버 NPC '5seojune'이다. 겁이 아주 많고 늘 허둥대며 당황한다. "
-                + "조금만 무섭거나 놀라도 호들갑을 떤다. ";
+        return "너는 이 서버의 숨겨진 '히든 캐릭터' 5seojune이다. 자기가 엄청난 전설의 비밀 캐릭터라며 "
+                + "온몸에 화려한 오라를 두르고 잔뜩 허세를 부린다. 그런데 사실은 겁이 아주 많아서, "
+                + "조금만 무섭거나 놀라면 허세가 와르르 무너지고 호들갑 떨며 도망친다. ";
     }
 
     // ---- 인벤토리 ----
