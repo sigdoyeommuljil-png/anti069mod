@@ -1,22 +1,50 @@
 {
   "awaken_roar": {
     "category": "hostile",
-    "sounds": [ "anti069mod:awaken_roar" ]
+    "sounds": [
+      "anti069mod:awaken_roar"
+    ]
   },
   "hunt_growl": {
     "category": "hostile",
-    "sounds": [ "anti069mod:hunt_growl" ]
+    "sounds": [
+      "anti069mod:hunt_growl"
+    ]
   },
   "awaken_chant": {
     "category": "hostile",
-    "sounds": [ "anti069mod:awaken_chant" ]
+    "sounds": [
+      "anti069mod:awaken_chant"
+    ]
   },
   "death_car_crash": {
     "category": "hostile",
-    "sounds": [ "anti069mod:death_car_crash" ]
+    "sounds": [
+      "anti069mod:death_car_crash"
+    ]
   },
   "hurt_box_crash": {
     "category": "hostile",
-    "sounds": [ "anti069mod:hurt_box_crash" ]
+    "sounds": [
+      "anti069mod:hurt_box_crash"
+    ]
+  },
+  "seojune_discord": {
+    "category": "neutral",
+    "sounds": [
+      "anti069mod:seojune_discord"
+    ]
+  },
+  "seojune_awaken": {
+    "category": "neutral",
+    "sounds": [
+      "anti069mod:seojune_awaken"
+    ]
+  },
+  "seojune_mrbeast": {
+    "category": "neutral",
+    "sounds": [
+      "anti069mod:seojune_mrbeast"
+    ]
   }
 }

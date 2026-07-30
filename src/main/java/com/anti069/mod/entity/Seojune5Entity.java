@@ -1,6 +1,7 @@
 package com.anti069.mod.entity;
 
 import com.anti069.mod.ai.GroqClient;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -14,12 +15,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.LookAtPlayerGoal;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -40,6 +44,29 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
     private int prankCooldown = 0;  // 폭발 장난 재사용 대기
     private final NonNullList<ItemStack> inventory = NonNullList.withSize(8, ItemStack.EMPTY);
 
+    // ---- 각성 단계 ----
+    private enum SPhase { NORMAL, SOILED, AWAKENED }
+    private SPhase sphase = SPhase.NORMAL;
+    private boolean awakened = false;   // 공격 goal 판정용(서버 전용이라 동기화 불필요)
+    private int soilTimer = -1;         // 설사 후 각성까지 남은 틱
+    private int mrbeastDelay = -1;      // 각성곡(yt1s) 끝나고 미스터비스트 시작까지
+    private int mrbeastTimer = 0;       // 미스터비스트 반복 카운트
+    private int weebYellTimer = 0;      // 씹덕 함성 도배 카운트
+
+    private static final int SEOJUNE_AWAKEN_TICKS = 26;   // yt1s 길이(약 1.3초)
+    private static final int SEOJUNE_MRBEAST_TICKS = 443; // 미스터비스트 길이(약 22초)
+
+    /** 각성 후 씹덕 함성(캔드, Groq 안 씀 → API 제한 무관). */
+    private static final String[] WEEB_LINES = {
+            "히야얍!",
+            "냥냥 펀치!",
+            "우효~!",
+            "받아라, 이 몸의 필살기냥!",
+            "냐하하! 전설이 강림했다!",
+            "큿... 각성한 나를 막을 순 없어!",
+            "이 몸의 진정한 힘을 봐라 냥!"
+    };
+
     public Seojune5Entity(EntityType<? extends PathfinderMob> type, Level level) {
         super(type, level);
     }
@@ -49,17 +76,33 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 .add(Attributes.MAX_HEALTH, 16.0)      // 겁쟁이라 좀 약함
                 .add(Attributes.MOVEMENT_SPEED, 0.32)  // 도망가야 하니 좀 빠름
                 .add(Attributes.FOLLOW_RANGE, 20.0)
+                .add(Attributes.ATTACK_DAMAGE, 4.0)    // 각성 후 공격용
                 // 로케이터바 표시(다른 NPC와 동일)
                 .add(Attributes.WAYPOINT_TRANSMIT_RANGE, 512.0);
     }
 
     @Override
     protected void registerGoals() {
-        // 싸우는 목표 없음(겁쟁이). 물 피하고, 돌아다니고, 쳐다보고, 두리번거리기만.
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new WaterAvoidingRandomStrollGoal(this, 1.0));
-        this.goalSelector.addGoal(2, new LookAtPlayerGoal(this, Player.class, 8.0F));
-        this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
+
+        // [각성 후에만] 근접 공격
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.5, true) {
+            @Override public boolean canUse() { return awakened && super.canUse(); }
+            @Override public boolean canContinueToUse() { return awakened && super.canContinueToUse(); }
+        });
+
+        // [평소에만] 돌아다니기
+        this.goalSelector.addGoal(2, new WaterAvoidingRandomStrollGoal(this, 1.0) {
+            @Override public boolean canUse() { return !awakened && super.canUse(); }
+        });
+        this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 8.0F));
+        this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+
+        // [각성 후에만] 가장 가까운 플레이어를 적으로
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, true) {
+            @Override public boolean canUse() { return awakened && super.canUse(); }
+            @Override public boolean canContinueToUse() { return awakened && super.canContinueToUse(); }
+        });
     }
 
     /** 가장 가까운 플레이어 반대 방향으로 도망. */
@@ -81,16 +124,26 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
         com.anti069.mod.ai.NpcCommands.tick(this); // 명령(따라오기 등) 유지
 
-        // '히든 캐릭터' 떡칠 오라: 2초마다 화려한 효과들을 다시 발라 파티클이 끊기지 않게 한다.
+        // '히든 캐릭터' 떡칠 오라: 각성 여부와 상관없이 항상 화려하게 유지
         if (this.tickCount % 40 == 0) applyHiddenAura();
 
-        // 겁먹은 동안은 계속 도망
+        // 설사(각성 전) 단계: 잠시 뒤 각성
+        if (sphase == SPhase.SOILED) {
+            if (soilTimer > 0 && --soilTimer <= 0) awaken5();
+            return; // 설사 중엔 다른 행동 안 함
+        }
+
+        // 각성 단계: 미스터비스트 배경음 반복 + 씹덕 함성 도배
+        if (sphase == SPhase.AWAKENED) {
+            tickAwakened();
+            return;
+        }
+
+        // ---- 평소(겁쟁이) ----
         if (panicTimer > 0) {
             panicTimer--;
             if (this.tickCount % 10 == 0) fleeFromNearestPlayer();
         }
-
-        // 근처 플레이어 있으면 5초쯤마다 허둥대는 혼잣말
         if (--idleTimer <= 0) {
             idleTimer = 100 + this.random.nextInt(60);
             if (this.level().getNearestPlayer(this, 24.0) != null) {
@@ -99,9 +152,84 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         }
     }
 
-    /** 맞으면 → 놀라서 폭발 장난 + 도망 시작 + 호들갑 대사. 반격은 안 함(겁쟁이). */
+    /** 각성 중 매 틱: yt1s 끝나면 미스터비스트 무한 반복 + 씹덕 함성 도배. */
+    private void tickAwakened() {
+        // 미스터비스트 배경음: 각성곡(yt1s)이 끝나는 시점부터 시작해 22초마다 반복
+        if (mrbeastDelay > 0) {
+            if (--mrbeastDelay <= 0) {
+                playMrbeast();
+                mrbeastTimer = SEOJUNE_MRBEAST_TICKS;
+            }
+        } else if (--mrbeastTimer <= 0) {
+            playMrbeast();
+            mrbeastTimer = SEOJUNE_MRBEAST_TICKS;
+        }
+
+        // 씹덕 함성 도배(캔드 대사라 Groq 안 씀 → API 제한 무관)
+        if (--weebYellTimer <= 0) {
+            weebYellTimer = 45; // 약 2.25초마다
+            MinecraftServer sv = server();
+            if (sv != null) {
+                String line = WEEB_LINES[this.random.nextInt(WEEB_LINES.length)];
+                sv.getPlayerList().broadcastSystemMessage(
+                        Component.literal("<5seojune> " + line), false);
+            }
+        }
+    }
+
+    private void playMrbeast() {
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                ModSounds.SEOJUNE_MRBEAST, SoundSource.NEUTRAL, 0.8f, 1.0f);
+    }
+
+    /** 죽을 만큼 맞으면 → 죽지 않고 '설사' 후 각성 시퀀스 시작. */
+    private void startSoiling() {
+        sphase = SPhase.SOILED;
+        soilTimer = 120; // 약 6초 뒤 각성(디스코드 소리 재생 시간만큼 뜸)
+        panicTimer = 0;
+        this.getNavigation().stop();
+        MinecraftServer server = server();
+        if (server != null) {
+            server.getPlayerList().broadcastSystemMessage(
+                    Component.literal("5seojune이(가) 바지에 설사를 지리고 말았습니다.")
+                            .withStyle(ChatFormatting.YELLOW), false);
+        }
+        // 디스코드 콜링 소리
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                ModSounds.SEOJUNE_DISCORD, SoundSource.NEUTRAL, 1.0f, 1.0f);
+    }
+
+    /** 각성: 몸은 그대로, 각성곡(yt1s) 1회 + 공격 모드 돌입. */
+    private void awaken5() {
+        sphase = SPhase.AWAKENED;
+        awakened = true;
+        soilTimer = -1;
+
+        // 각성곡(yt1s) 1회. 끝나면(mrbeastDelay 후) 미스터비스트 시작.
+        this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                ModSounds.SEOJUNE_AWAKEN, SoundSource.NEUTRAL, 1.0f, 1.0f);
+        mrbeastDelay = SEOJUNE_AWAKEN_TICKS;
+
+        // 공격하러 오도록 좀 빨라짐
+        AttributeInstance spd = this.getAttribute(Attributes.MOVEMENT_SPEED);
+        if (spd != null) spd.setBaseValue(0.42);
+    }
+
+    /** 맞으면 → (평소) 놀라서 폭발 장난+도망 / (죽을 만큼) 설사 후 각성 / (각성 후) 그냥 피해받음. */
     @Override
     public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        // 각성 후엔 겁쟁이 행동 없음. 평범하게 피해만 받는다.
+        if (awakened) return super.hurtServer(level, source, amount);
+        // 설사(각성 대기) 중엔 무적처럼 버틴다.
+        if (sphase == SPhase.SOILED) return false;
+
+        // 플레이어에게 죽을 만큼 맞으면 → 죽지 않고 '설사' 후 각성
+        if (source.getEntity() instanceof Player && this.getHealth() - amount <= 0.0f) {
+            this.setHealth(this.getMaxHealth());
+            startSoiling();
+            return false;
+        }
+
         boolean result = super.hurtServer(level, source, amount);
         if (result) {
             panicTimer = 20 * 6;      // 6초간 겁먹고 도망
@@ -193,9 +321,10 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
     /** 5seojune 공통 성격 설명. */
     private String personaBase() {
-        return "너는 이 서버의 숨겨진 '히든 캐릭터' 5seojune이다. 자기가 엄청난 전설의 비밀 캐릭터라며 "
-                + "온몸에 화려한 오라를 두르고 잔뜩 허세를 부린다. 그런데 사실은 겁이 아주 많아서, "
-                + "조금만 무섭거나 놀라면 허세가 와르르 무너지고 호들갑 떨며 도망친다. ";
+        return "너는 이 서버의 숨겨진 '히든 캐릭터' 5seojune이다. 자기가 진짜로 엄청난 전설의 비밀 캐릭터라고 "
+                + "굳게 믿는 중2병에 걸려 있다(비유가 아니라 진심으로 믿는다). 거창하고 오글거리는 말투로 "
+                + "자신의 전설과 숨겨진 힘을 진지하게 떠벌린다. 그런데 사실은 겁이 아주 많아서, 조금만 "
+                + "무섭거나 놀라면 그 믿음이 순식간에 와르르 무너지고 호들갑 떨며 도망친다. ";
     }
 
     // ---- 인벤토리 ----
