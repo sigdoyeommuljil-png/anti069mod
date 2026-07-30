@@ -4,6 +4,7 @@ import com.anti069.mod.ai.GroqClient;
 import com.anti069.mod.item.ModItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -78,7 +79,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
     public static AttributeSupplier.Builder createAttributes() {
         return Mob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 4.0)       // 피 엄청 약함(2칸)
-                .add(Attributes.MOVEMENT_SPEED, 0.32)  // 도망가야 하니 좀 빠름
+                .add(Attributes.MOVEMENT_SPEED, 0.25)  // 일반 플레이어 달리기 정도
                 .add(Attributes.FOLLOW_RANGE, 20.0)
                 .add(Attributes.ATTACK_DAMAGE, 4.0)    // 각성 후 공격용
                 // 로케이터바 표시(다른 NPC와 동일)
@@ -90,7 +91,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         this.goalSelector.addGoal(0, new FloatGoal(this));
 
         // [각성 후에만] 근접 공격
-        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.5, true) {
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.1, true) {
             @Override public boolean canUse() { return awakened && super.canUse(); }
             @Override public boolean canContinueToUse() { return awakened && super.canContinueToUse(); }
         });
@@ -116,7 +117,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         Vec3 away = this.position().subtract(near.position());
         if (away.lengthSqr() < 1.0e-4) away = new Vec3(1, 0, 0);
         Vec3 dest = this.position().add(away.normalize().scale(12.0));
-        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.8); // 겁나서 빠르게
+        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.15); // 도망(과하지 않게)
     }
 
     @Override
@@ -133,7 +134,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
         // 설사(각성 전) 단계: 안 보이게 + 사방으로 똥 분출 + 치킨 스크림 도배, 잠시 뒤 각성
         if (sphase == SPhase.SOILED) {
-            wrapInPoop(20);               // 매 틱 오서준을 공처럼 촘촘히 감싼다(랙 감수)
+            forceField();                 // 오서준 주위를 포스 필드(파티클 구체)로 감싼다
             if (--chickenTimer <= 0) {    // 치킨 스크림 도배(약 1.2초마다)
                 chickenTimer = 24;
                 this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
@@ -182,7 +183,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             if (sv != null) {
                 String line = WEEB_LINES[this.random.nextInt(WEEB_LINES.length)];
                 sv.getPlayerList().broadcastSystemMessage(
-                        Component.literal("<오서준> " + line), false);
+                        Component.literal("<5seojune> " + line), false);
             }
         }
 
@@ -213,7 +214,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         MinecraftServer server = server();
         if (server != null) {
             server.getPlayerList().broadcastSystemMessage(
-                    Component.literal("오서준이(가) 바지에 설사를 지리고 말았습니다.")
+                    Component.literal("5seojune이(가) 바지에 설사를 지리고 말았습니다.")
                             .withStyle(ChatFormatting.YELLOW), false);
         }
         // 디스코드 콜링 소리
@@ -221,23 +222,18 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 ModSounds.SEOJUNE_DISCORD, SoundSource.NEUTRAL, 1.0f, 1.0f);
     }
 
-    /** 오서준을 중심으로 '똥' 아이템을 구체 껍질처럼 촘촘히 뿌려 완전히 감싼다(안 보이게). */
-    private void wrapInPoop(int count) {
-        ItemStack poop = poopStack();
-        if (poop.isEmpty()) return;
-        double r = 1.3; // 감싸는 반경
-        for (int i = 0; i < count; i++) {
-            // 구 표면의 무작위 방향
-            double u = this.random.nextDouble() * 2.0 - 1.0;      // z축 성분(-1~1)
-            double t = this.random.nextDouble() * Math.PI * 2.0;  // 방위각
+    /** 오서준을 중심으로 파티클을 구체 껍질처럼 뿌려 '포스 필드'를 만든다(아이템 안 뿌림 → 렉·잔해 없음). */
+    private void forceField() {
+        if (!(this.level() instanceof ServerLevel sl)) return;
+        double r = 1.4; // 필드 반경
+        for (int i = 0; i < 40; i++) {
+            double u = this.random.nextDouble() * 2.0 - 1.0;
+            double t = this.random.nextDouble() * Math.PI * 2.0;
             double s = Math.sqrt(1.0 - u * u);
             double dx = s * Math.cos(t), dy = u, dz = s * Math.sin(t);
-            ItemEntity ie = new ItemEntity(this.level(),
+            sl.sendParticles(ParticleTypes.LARGE_SMOKE,
                     this.getX() + dx * r, this.getY() + 1.0 + dy * r, this.getZ() + dz * r,
-                    poop.copy());
-            // 중력을 잠깐 상쇄하도록 살짝 띄우고 바깥으로 약하게(공 모양 유지)
-            ie.setDeltaMovement(dx * 0.04, 0.12 + dy * 0.04, dz * 0.04);
-            this.level().addFreshEntity(ie);
+                    1, 0.0, 0.0, 0.0, 0.0);
         }
     }
 
@@ -279,7 +275,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
         // 공격하러 오도록 좀 빨라짐
         AttributeInstance spd = this.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (spd != null) spd.setBaseValue(0.42);
+        if (spd != null) spd.setBaseValue(0.28);
     }
 
     /** 맞으면 → (평소) 놀라서 폭발 장난+도망 / (죽을 만큼) 설사 후 각성 / (각성 후) 그냥 피해받음. */
@@ -388,7 +384,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
     /** 5seojune(오서준) 공통 성격 설명. */
     private String personaBase() {
-        return "너는 '오서준'이다. 원래 069_36의 진짜 친구로, 그저 그런 평범한 친구였다. "
+        return "너는 '5seojune'이다. 원래 069_36의 진짜 친구로, 그저 그런 평범한 친구였다. "
                 + "그런데 어느 날 갑자기 '어떤 빛'을 보게 되어 완전히 달라졌다. 이제 자기가 진짜로 "
                 + "엄청난 전설의 숨겨진 존재라고 굳게 믿는 중2병에 걸려, 거창하고 오글거리게 자신의 "
                 + "전설과 그 '빛'에 대해 진지하게 떠벌린다. 그런데 사실은 겁이 아주 많아서, 조금만 "
@@ -444,7 +440,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             dropInventory();
             announceDeath();
             speakDying();
-            com.anti069.mod.ai.NpcTalk.deathSeen(this, "오서준");
+            com.anti069.mod.ai.NpcTalk.deathSeen(this, "5seojune");
         }
         if (this.level() instanceof ServerLevel sl) {
             com.anti069.mod.Anti069Mod.scheduleRespawn(sl, this.getX(), this.getY(), this.getZ(), ModEntities.SEOJUNE5);
@@ -484,8 +480,8 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             String line = (reply != null && !reply.isEmpty()) ? reply : fallback;
             server.execute(() -> {
                 server.getPlayerList().broadcastSystemMessage(
-                        Component.literal("<오서준> " + line), false);
-                if (chainNpc) com.anti069.mod.ai.NpcTalk.lineSpoken(this, "오서준", line);
+                        Component.literal("<5seojune> " + line), false);
+                if (chainNpc) com.anti069.mod.ai.NpcTalk.lineSpoken(this, "5seojune", line);
             });
         });
     }

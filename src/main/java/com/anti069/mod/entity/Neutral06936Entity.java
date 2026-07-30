@@ -42,7 +42,7 @@ public class Neutral06936Entity extends PathfinderMob implements NpcInventoryHol
     public static AttributeSupplier.Builder createAttributes() {
         return Mob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.28)
+                .add(Attributes.MOVEMENT_SPEED, 0.25)
                 .add(Attributes.ATTACK_DAMAGE, 3.0)
                 .add(Attributes.FOLLOW_RANGE, 24.0)
                 // 로케이터바 표시(자세한 설명은 anti069 쪽 참고)
@@ -53,7 +53,7 @@ public class Neutral06936Entity extends PathfinderMob implements NpcInventoryHol
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         // 체력 30% 초과일 때만 맞서 싸움 (그 이하로 떨어지면 도망 로직이 우선)
-        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.2, true) {
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.1, true) {
             @Override public boolean canUse() { return healthRatio() > 0.3f && super.canUse(); }
             @Override public boolean canContinueToUse() { return healthRatio() > 0.3f && super.canContinueToUse(); }
         });
@@ -77,7 +77,7 @@ public class Neutral06936Entity extends PathfinderMob implements NpcInventoryHol
         Vec3 away = this.position().subtract(near.position());
         if (away.lengthSqr() < 1.0e-4) away = new Vec3(1, 0, 0);
         Vec3 dest = this.position().add(away.normalize().scale(10.0));
-        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.6);
+        this.getNavigation().moveTo(dest.x, dest.y, dest.z, 1.1);
     }
 
     @Override

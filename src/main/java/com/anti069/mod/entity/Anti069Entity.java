@@ -85,7 +85,7 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
     public static AttributeSupplier.Builder createAttributes() {
         return Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0)
-                .add(Attributes.MOVEMENT_SPEED, 0.33)
+                .add(Attributes.MOVEMENT_SPEED, 0.25)
                 .add(Attributes.ATTACK_DAMAGE, 8.0)
                 .add(Attributes.FOLLOW_RANGE, 32.0)
                 .add(Attributes.KNOCKBACK_RESISTANCE, 1.0)
@@ -99,13 +99,13 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
         this.goalSelector.addGoal(0, new FloatGoal(this));
 
         // [각성 후에만] 근접 공격
-        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.4, true) {
+        this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.1, true) {
             @Override public boolean canUse() { return isAwakened() && super.canUse(); }
             @Override public boolean canContinueToUse() { return isAwakened() && super.canContinueToUse(); }
         });
 
         // [평소에만, 체력 30% 이하] 플레이어에게서 도망
-        this.goalSelector.addGoal(2, new AvoidEntityGoal<>(this, Player.class, 12.0f, 1.4, 1.7) {
+        this.goalSelector.addGoal(2, new AvoidEntityGoal<>(this, Player.class, 12.0f, 1.1, 1.2) {
             @Override public boolean canUse() { return !isAwakened() && healthRatio() <= 0.3f && super.canUse(); }
             @Override public boolean canContinueToUse() { return !isAwakened() && healthRatio() <= 0.3f && super.canContinueToUse(); }
         });
@@ -470,7 +470,7 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
         this.setSilent(false);
 
         AttributeInstance spd = this.getAttribute(Attributes.MOVEMENT_SPEED);
-        if (spd != null) spd.setBaseValue(0.45);
+        if (spd != null) spd.setBaseValue(0.28);
         AttributeInstance range = this.getAttribute(Attributes.FOLLOW_RANGE);
         if (range != null) range.setBaseValue(256.0);
 
