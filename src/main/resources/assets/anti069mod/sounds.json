@@ -46,5 +46,11 @@
     "sounds": [
       "anti069mod:seojune_mrbeast"
     ]
+  },
+  "seojune_chicken": {
+    "category": "neutral",
+    "sounds": [
+      "anti069mod:seojune_chicken"
+    ]
   }
 }

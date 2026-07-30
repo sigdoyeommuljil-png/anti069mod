@@ -26,6 +26,7 @@ import net.minecraft.world.entity.ai.goal.WaterAvoidingRandomStrollGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
@@ -52,6 +53,8 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
     private int mrbeastDelay = -1;      // 각성곡(yt1s) 끝나고 미스터비스트 시작까지
     private int mrbeastTimer = 0;       // 미스터비스트 반복 카운트
     private int weebYellTimer = 0;      // 씹덕 함성 도배 카운트
+    private int chickenTimer = 0;       // 설사 단계 치킨 스크림 도배 카운트
+    private int poopAtkCooldown = 0;    // 각성 후 똥 공격 재사용 대기
 
     private static final int SEOJUNE_AWAKEN_TICKS = 26;   // yt1s 길이(약 1.3초)
     private static final int SEOJUNE_MRBEAST_TICKS = 443; // 미스터비스트 길이(약 22초)
@@ -73,7 +76,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
     public static AttributeSupplier.Builder createAttributes() {
         return Mob.createMobAttributes()
-                .add(Attributes.MAX_HEALTH, 16.0)      // 겁쟁이라 좀 약함
+                .add(Attributes.MAX_HEALTH, 4.0)       // 피 엄청 약함(2칸)
                 .add(Attributes.MOVEMENT_SPEED, 0.32)  // 도망가야 하니 좀 빠름
                 .add(Attributes.FOLLOW_RANGE, 20.0)
                 .add(Attributes.ATTACK_DAMAGE, 4.0)    // 각성 후 공격용
@@ -127,10 +130,16 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         // '히든 캐릭터' 떡칠 오라: 각성 여부와 상관없이 항상 화려하게 유지
         if (this.tickCount % 40 == 0) applyHiddenAura();
 
-        // 설사(각성 전) 단계: 잠시 뒤 각성
+        // 설사(각성 전) 단계: 안 보이게 + 사방으로 똥 분출 + 치킨 스크림 도배, 잠시 뒤 각성
         if (sphase == SPhase.SOILED) {
+            if (this.tickCount % 4 == 0) sprayPoop(3);  // 4틱마다 갈색 염료 3개씩 사방으로
+            if (--chickenTimer <= 0) {    // 치킨 스크림 도배(약 1.2초마다)
+                chickenTimer = 24;
+                this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        ModSounds.SEOJUNE_CHICKEN, SoundSource.NEUTRAL, 1.0f, 1.0f);
+            }
             if (soilTimer > 0 && --soilTimer <= 0) awaken5();
-            return; // 설사 중엔 다른 행동 안 함
+            return;
         }
 
         // 각성 단계: 미스터비스트 배경음 반복 + 씹덕 함성 도배
@@ -172,8 +181,18 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             if (sv != null) {
                 String line = WEEB_LINES[this.random.nextInt(WEEB_LINES.length)];
                 sv.getPlayerList().broadcastSystemMessage(
-                        Component.literal("<5seojune> " + line), false);
+                        Component.literal("<오서준> " + line), false);
             }
+        }
+
+        // 플레이어가 가까우면 → 치킨 스크림 + 똥(갈색 염료) 공격
+        if (poopAtkCooldown > 0) poopAtkCooldown--;
+        Player near = this.level().getNearestPlayer(this, 4.0);
+        if (near != null && poopAtkCooldown <= 0) {
+            poopAtkCooldown = 25; // 약 1.25초 쿨타임
+            this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
+                    ModSounds.SEOJUNE_CHICKEN, SoundSource.NEUTRAL, 1.0f, 1.0f);
+            throwPoopAt(near);
         }
     }
 
@@ -182,16 +201,18 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 ModSounds.SEOJUNE_MRBEAST, SoundSource.NEUTRAL, 0.8f, 1.0f);
     }
 
-    /** 죽을 만큼 맞으면 → 죽지 않고 '설사' 후 각성 시퀀스 시작. */
+    /** 죽을 만큼 맞으면 → 죽지 않고 '설사' 후 각성 시퀀스 시작. 웅장하게 안 보이며 똥을 뿜는다. */
     private void startSoiling() {
         sphase = SPhase.SOILED;
-        soilTimer = 120; // 약 6초 뒤 각성(디스코드 소리 재생 시간만큼 뜸)
+        soilTimer = 120; // 약 6초 뒤 각성
         panicTimer = 0;
         this.getNavigation().stop();
+        this.setNoAi(true);        // 그 자리에 멈춰서 연출
+        this.setInvisible(true);   // 똥 오라에 가려 오서준은 안 보이게
         MinecraftServer server = server();
         if (server != null) {
             server.getPlayerList().broadcastSystemMessage(
-                    Component.literal("5seojune이(가) 바지에 설사를 지리고 말았습니다.")
+                    Component.literal("오서준이(가) 바지에 설사를 지리고 말았습니다.")
                             .withStyle(ChatFormatting.YELLOW), false);
         }
         // 디스코드 콜링 소리
@@ -199,11 +220,56 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 ModSounds.SEOJUNE_DISCORD, SoundSource.NEUTRAL, 1.0f, 1.0f);
     }
 
-    /** 각성: 몸은 그대로, 각성곡(yt1s) 1회 + 공격 모드 돌입. */
+    /** 갈색 염료(똥 눈속임)를 사방으로 뿜는다. */
+    private void sprayPoop(int count) {
+        ItemStack dye = brownDyeStack();
+        if (dye.isEmpty()) return;
+        for (int i = 0; i < count; i++) {
+            ItemEntity poop = new ItemEntity(this.level(),
+                    this.getX(), this.getY() + 1.0, this.getZ(), dye.copy());
+            double ang = this.random.nextDouble() * Math.PI * 2.0;
+            double horiz = 0.3 + this.random.nextDouble() * 0.3;
+            double up = 0.3 + this.random.nextDouble() * 0.4;
+            poop.setDeltaMovement(Math.cos(ang) * horiz, up, Math.sin(ang) * horiz);
+            this.level().addFreshEntity(poop);
+        }
+    }
+
+    /** 갈색 염료 1개 스택. 아이템은 레지스트리 이름 문자열로 찾아 26.x 이름변경에 안 걸리게. */
+    private ItemStack brownDyeStack() {
+        for (Item it : BuiltInRegistries.ITEM) {
+            if (BuiltInRegistries.ITEM.getKey(it).toString().equals("minecraft:brown_dye")) {
+                return new ItemStack(it);
+            }
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** 각성 후: 대상 플레이어 쪽으로 똥(갈색 염료)을 여러 개 던진다. */
+    private void throwPoopAt(Player target) {
+        ItemStack dye = brownDyeStack();
+        if (dye.isEmpty()) return;
+        Vec3 dir = target.position().add(0, 0.5, 0).subtract(this.position().add(0, 1.2, 0));
+        if (dir.lengthSqr() < 1.0e-4) return;
+        dir = dir.normalize();
+        for (int i = 0; i < 5; i++) {
+            ItemEntity poop = new ItemEntity(this.level(),
+                    this.getX(), this.getY() + 1.2, this.getZ(), dye.copy());
+            Vec3 v = dir.scale(0.8).add(
+                    (this.random.nextDouble() - 0.5) * 0.2, 0.15,
+                    (this.random.nextDouble() - 0.5) * 0.2);
+            poop.setDeltaMovement(v.x, v.y, v.z);
+            this.level().addFreshEntity(poop);
+        }
+    }
+
+    /** 각성: 다시 나타나며, 각성곡(yt1s) 1회 + 공격 모드 돌입. 몸은 그대로. */
     private void awaken5() {
         sphase = SPhase.AWAKENED;
         awakened = true;
         soilTimer = -1;
+        this.setInvisible(false);  // 똥 오라 걷히고 등장
+        this.setNoAi(false);
 
         // 각성곡(yt1s) 1회. 끝나면(mrbeastDelay 후) 미스터비스트 시작.
         this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
@@ -319,11 +385,12 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         askAndSay(server, persona, "플레이어가 나를 때렸다! 무서워서 도망친다!", "으아악! 살려줘!", false);
     }
 
-    /** 5seojune 공통 성격 설명. */
+    /** 5seojune(오서준) 공통 성격 설명. */
     private String personaBase() {
-        return "너는 이 서버의 숨겨진 '히든 캐릭터' 5seojune이다. 자기가 진짜로 엄청난 전설의 비밀 캐릭터라고 "
-                + "굳게 믿는 중2병에 걸려 있다(비유가 아니라 진심으로 믿는다). 거창하고 오글거리는 말투로 "
-                + "자신의 전설과 숨겨진 힘을 진지하게 떠벌린다. 그런데 사실은 겁이 아주 많아서, 조금만 "
+        return "너는 '오서준'이다. 원래 069_36의 진짜 친구로, 그저 그런 평범한 친구였다. "
+                + "그런데 어느 날 갑자기 '어떤 빛'을 보게 되어 완전히 달라졌다. 이제 자기가 진짜로 "
+                + "엄청난 전설의 숨겨진 존재라고 굳게 믿는 중2병에 걸려, 거창하고 오글거리게 자신의 "
+                + "전설과 그 '빛'에 대해 진지하게 떠벌린다. 그런데 사실은 겁이 아주 많아서, 조금만 "
                 + "무섭거나 놀라면 그 믿음이 순식간에 와르르 무너지고 호들갑 떨며 도망친다. ";
     }
 
@@ -376,7 +443,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             dropInventory();
             announceDeath();
             speakDying();
-            com.anti069.mod.ai.NpcTalk.deathSeen(this, "5seojune");
+            com.anti069.mod.ai.NpcTalk.deathSeen(this, "오서준");
         }
         if (this.level() instanceof ServerLevel sl) {
             com.anti069.mod.Anti069Mod.scheduleRespawn(sl, this.getX(), this.getY(), this.getZ(), ModEntities.SEOJUNE5);
@@ -416,8 +483,8 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             String line = (reply != null && !reply.isEmpty()) ? reply : fallback;
             server.execute(() -> {
                 server.getPlayerList().broadcastSystemMessage(
-                        Component.literal("<5seojune> " + line), false);
-                if (chainNpc) com.anti069.mod.ai.NpcTalk.lineSpoken(this, "5seojune", line);
+                        Component.literal("<오서준> " + line), false);
+                if (chainNpc) com.anti069.mod.ai.NpcTalk.lineSpoken(this, "오서준", line);
             });
         });
     }

@@ -40,7 +40,7 @@ public final class FakeTab {
         for (Entity e : ents) {
             // anti069 는 '평범한 플레이어인 척'하는 컨셉이라 이 이름이 그대로 뜨는 게 속임수가 된다.
             if (e instanceof Anti069Entity) out.add("anti069");
-            else if (e instanceof Seojune5Entity) out.add("5seojune");
+            else if (e instanceof Seojune5Entity) out.add("오서준");
             else out.add("069_36");
         }
         return out;
