@@ -56,6 +56,7 @@ public class Anti069Mod implements ModInitializer {
     @Override
     public void onInitialize() {
         ModEntities.registerModEntities();
+        com.anti069.mod.item.ModItems.registerModItems();
         ModSounds.registerModSounds();
         registerNeutralChatListener();
         registerJoinNotice();

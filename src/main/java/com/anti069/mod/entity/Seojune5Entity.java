@@ -1,6 +1,7 @@
 package com.anti069.mod.entity;
 
 import com.anti069.mod.ai.GroqClient;
+import com.anti069.mod.item.ModItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -132,7 +133,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
         // 설사(각성 전) 단계: 안 보이게 + 사방으로 똥 분출 + 치킨 스크림 도배, 잠시 뒤 각성
         if (sphase == SPhase.SOILED) {
-            if (this.tickCount % 4 == 0) sprayPoop(3);  // 4틱마다 갈색 염료 3개씩 사방으로
+            wrapInPoop(20);               // 매 틱 오서준을 공처럼 촘촘히 감싼다(랙 감수)
             if (--chickenTimer <= 0) {    // 치킨 스크림 도배(약 1.2초마다)
                 chickenTimer = 24;
                 this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
@@ -204,7 +205,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
     /** 죽을 만큼 맞으면 → 죽지 않고 '설사' 후 각성 시퀀스 시작. 웅장하게 안 보이며 똥을 뿜는다. */
     private void startSoiling() {
         sphase = SPhase.SOILED;
-        soilTimer = 120; // 약 6초 뒤 각성
+        soilTimer = 300; // 15초 뒤 각성
         panicTimer = 0;
         this.getNavigation().stop();
         this.setNoAi(true);        // 그 자리에 멈춰서 연출
@@ -220,46 +221,46 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 ModSounds.SEOJUNE_DISCORD, SoundSource.NEUTRAL, 1.0f, 1.0f);
     }
 
-    /** 갈색 염료(똥 눈속임)를 사방으로 뿜는다. */
-    private void sprayPoop(int count) {
-        ItemStack dye = brownDyeStack();
-        if (dye.isEmpty()) return;
+    /** 오서준을 중심으로 '똥' 아이템을 구체 껍질처럼 촘촘히 뿌려 완전히 감싼다(안 보이게). */
+    private void wrapInPoop(int count) {
+        ItemStack poop = poopStack();
+        if (poop.isEmpty()) return;
+        double r = 1.3; // 감싸는 반경
         for (int i = 0; i < count; i++) {
-            ItemEntity poop = new ItemEntity(this.level(),
-                    this.getX(), this.getY() + 1.0, this.getZ(), dye.copy());
-            double ang = this.random.nextDouble() * Math.PI * 2.0;
-            double horiz = 0.3 + this.random.nextDouble() * 0.3;
-            double up = 0.3 + this.random.nextDouble() * 0.4;
-            poop.setDeltaMovement(Math.cos(ang) * horiz, up, Math.sin(ang) * horiz);
-            this.level().addFreshEntity(poop);
+            // 구 표면의 무작위 방향
+            double u = this.random.nextDouble() * 2.0 - 1.0;      // z축 성분(-1~1)
+            double t = this.random.nextDouble() * Math.PI * 2.0;  // 방위각
+            double s = Math.sqrt(1.0 - u * u);
+            double dx = s * Math.cos(t), dy = u, dz = s * Math.sin(t);
+            ItemEntity ie = new ItemEntity(this.level(),
+                    this.getX() + dx * r, this.getY() + 1.0 + dy * r, this.getZ() + dz * r,
+                    poop.copy());
+            // 중력을 잠깐 상쇄하도록 살짝 띄우고 바깥으로 약하게(공 모양 유지)
+            ie.setDeltaMovement(dx * 0.04, 0.12 + dy * 0.04, dz * 0.04);
+            this.level().addFreshEntity(ie);
         }
     }
 
-    /** 갈색 염료 1개 스택. 아이템은 레지스트리 이름 문자열로 찾아 26.x 이름변경에 안 걸리게. */
-    private ItemStack brownDyeStack() {
-        for (Item it : BuiltInRegistries.ITEM) {
-            if (BuiltInRegistries.ITEM.getKey(it).toString().equals("minecraft:brown_dye")) {
-                return new ItemStack(it);
-            }
-        }
-        return ItemStack.EMPTY;
+    /** 커스텀 '똥' 아이템 1개. 진짜 염료가 아니라 주워도 쓸모없는 전용 아이템. */
+    private ItemStack poopStack() {
+        return new ItemStack(ModItems.TTONG);
     }
 
-    /** 각성 후: 대상 플레이어 쪽으로 똥(갈색 염료)을 여러 개 던진다. */
+    /** 각성 후: 대상 플레이어 쪽으로 똥을 여러 개 던진다. */
     private void throwPoopAt(Player target) {
-        ItemStack dye = brownDyeStack();
-        if (dye.isEmpty()) return;
+        ItemStack poop = poopStack();
+        if (poop.isEmpty()) return;
         Vec3 dir = target.position().add(0, 0.5, 0).subtract(this.position().add(0, 1.2, 0));
         if (dir.lengthSqr() < 1.0e-4) return;
         dir = dir.normalize();
         for (int i = 0; i < 5; i++) {
-            ItemEntity poop = new ItemEntity(this.level(),
-                    this.getX(), this.getY() + 1.2, this.getZ(), dye.copy());
+            ItemEntity ie = new ItemEntity(this.level(),
+                    this.getX(), this.getY() + 1.2, this.getZ(), poop.copy());
             Vec3 v = dir.scale(0.8).add(
                     (this.random.nextDouble() - 0.5) * 0.2, 0.15,
                     (this.random.nextDouble() - 0.5) * 0.2);
-            poop.setDeltaMovement(v.x, v.y, v.z);
-            this.level().addFreshEntity(poop);
+            ie.setDeltaMovement(v.x, v.y, v.z);
+            this.level().addFreshEntity(ie);
         }
     }
 
