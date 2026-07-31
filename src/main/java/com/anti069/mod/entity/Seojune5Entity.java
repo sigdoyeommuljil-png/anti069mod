@@ -231,7 +231,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
     private void forceField() {
         if (!(this.level() instanceof ServerLevel sl)) return;
         // 커스텀 '똥' 아이템의 부스러기 파티클 = 갈색 똥 파티클
-        ItemParticleOption ttongParticle = new ItemParticleOption(ParticleTypes.ITEM, poopStack());
+        ItemParticleOption ttongParticle = new ItemParticleOption(ParticleTypes.ITEM, ModItems.TTONG);
         double r = 1.4; // 필드 반경
         for (int i = 0; i < 40; i++) {
             double u = this.random.nextDouble() * 2.0 - 1.0;
