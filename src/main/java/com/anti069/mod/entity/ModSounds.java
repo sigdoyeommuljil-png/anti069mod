@@ -20,6 +20,7 @@ public class ModSounds {
     public static final SoundEvent SEOJUNE_AWAKEN = register("seojune_awaken");    // 5seojune 각성 순간 1회
     public static final SoundEvent SEOJUNE_MRBEAST = register("seojune_mrbeast");  // 5seojune 각성 배경음(반복)
     public static final SoundEvent SEOJUNE_CHICKEN = register("seojune_chicken");  // 오서준 치킨 스크림(도배/공격)
+    public static final SoundEvent JUMPSCARE = register("jumpscare");              // anti069 점프스케어
 
     private static SoundEvent register(String name) {
         Identifier id = Identifier.fromNamespaceAndPath(Anti069Mod.MOD_ID, name);

@@ -4,6 +4,7 @@ import com.anti069.mod.ai.GroqClient;
 import com.anti069.mod.item.ModItems;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -187,7 +188,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             }
         }
 
-        // 플레이어가 가까우면 → 치킨 스크림 + 똥(갈색 염료) 공격
+        // 플레이어가 가까우면 → 치킨 스크림 + 똥 투사체 공격(맞으면 데미지)
         if (poopAtkCooldown > 0) poopAtkCooldown--;
         Player near = this.level().getNearestPlayer(this, 4.0);
         if (near != null && poopAtkCooldown <= 0) {
@@ -195,6 +196,10 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
             this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
                     ModSounds.SEOJUNE_CHICKEN, SoundSource.NEUTRAL, 1.0f, 1.0f);
             throwPoopAt(near);
+            // 똥 명중 데미지(진짜 무기). mobAttack 데미지 소스로 3.0(=1.5칸).
+            if (this.level() instanceof ServerLevel sl) {
+                near.hurtServer(sl, this.damageSources().mobAttack(this), 3.0f);
+            }
         }
     }
 
@@ -222,16 +227,18 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 ModSounds.SEOJUNE_DISCORD, SoundSource.NEUTRAL, 1.0f, 1.0f);
     }
 
-    /** 오서준을 중심으로 파티클을 구체 껍질처럼 뿌려 '포스 필드'를 만든다(아이템 안 뿌림 → 렉·잔해 없음). */
+    /** 5seojune을 중심으로 '똥' 파티클을 구체 껍질처럼 뿌려 똥 포스 필드를 만든다(아이템 안 뿌림 → 렉·잔해 없음). */
     private void forceField() {
         if (!(this.level() instanceof ServerLevel sl)) return;
+        // 커스텀 '똥' 아이템의 부스러기 파티클 = 갈색 똥 파티클
+        ItemParticleOption ttongParticle = new ItemParticleOption(ParticleTypes.ITEM, poopStack());
         double r = 1.4; // 필드 반경
         for (int i = 0; i < 40; i++) {
             double u = this.random.nextDouble() * 2.0 - 1.0;
             double t = this.random.nextDouble() * Math.PI * 2.0;
             double s = Math.sqrt(1.0 - u * u);
             double dx = s * Math.cos(t), dy = u, dz = s * Math.sin(t);
-            sl.sendParticles(ParticleTypes.LARGE_SMOKE,
+            sl.sendParticles(ttongParticle,
                     this.getX() + dx * r, this.getY() + 1.0 + dy * r, this.getZ() + dz * r,
                     1, 0.0, 0.0, 0.0, 0.0);
         }

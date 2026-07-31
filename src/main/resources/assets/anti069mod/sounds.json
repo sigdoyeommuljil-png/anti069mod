@@ -52,5 +52,11 @@
     "sounds": [
       "anti069mod:seojune_chicken"
     ]
+  },
+  "jumpscare": {
+    "category": "hostile",
+    "sounds": [
+      "anti069mod:jumpscare"
+    ]
   }
 }

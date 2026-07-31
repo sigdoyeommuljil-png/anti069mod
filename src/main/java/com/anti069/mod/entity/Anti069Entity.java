@@ -56,6 +56,7 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
     private int preLeaveTimer = -1; // 나간 척 하기까지 남은 틱(-1=대기 안함)
     private int growlTimer = 0;
     private int chantTimer = 0;   // 각성 배경음(chant) 재생 간격 카운트. 0 이하가 되면 다시 재생
+    private int jumpscareCooldown = 0; // 점프스케어 재사용 대기(연속 발동 방지)
     private int watchTimer = 0;   // 각성 중 "지켜보고있다" 협박 대사 도배 간격 카운트
     private int talkCooldown = 0; // 대사 쿨타임(틱). 20틱=1초
     private int idleTimer = 100;  // 혼잣말 타이머
@@ -546,6 +547,20 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
                     String line = WATCH_LINES[this.random.nextInt(WATCH_LINES.length)];
                     sv.getPlayerList().broadcastSystemMessage(
                             Component.literal("<anti069> " + line), false);
+                }
+            }
+            // 점프스케어: 붙잡힐 만큼(2블록) 가까운 플레이어에게 비명 소리 + 화면 암전
+            if (jumpscareCooldown > 0) jumpscareCooldown--;
+            if (jumpscareCooldown <= 0) {
+                for (Player p : this.level().players()) {
+                    if (p.distanceToSqr(this) <= 2.0 * 2.0) {
+                        jumpscareCooldown = 80; // 4초 쿨타임(연속 도배 방지)
+                        this.level().playSound(null, p.getX(), p.getY(), p.getZ(),
+                                ModSounds.JUMPSCARE, SoundSource.HOSTILE, 1.0f, 1.0f);
+                        // 비명 길이(약 2.8초)만큼 화면 암전
+                        p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 56, 0, false, false));
+                        break;
+                    }
                 }
             }
             // 각성 상태에서 30블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
