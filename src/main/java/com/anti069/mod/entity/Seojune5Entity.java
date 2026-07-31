@@ -167,6 +167,8 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
     /** 각성 중 매 틱: yt1s 끝나면 미스터비스트 무한 반복 + 씹덕 함성 도배. */
     private void tickAwakened() {
+        awakenAura(); // 각성 티 확 나게: 불꽃 + 무지개 씹덕 파티클 난장판
+
         // 미스터비스트 배경음: 각성곡(yt1s)이 끝나는 시점부터 시작해 22초마다 반복
         if (mrbeastDelay > 0) {
             if (--mrbeastDelay <= 0) {
@@ -207,6 +209,22 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
     private void playMrbeast() {
         this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
                 ModSounds.SEOJUNE_MRBEAST, SoundSource.NEUTRAL, 0.8f, 1.0f);
+    }
+
+    /** 각성한 5seojune을 눈에 확 띄게: 몸에서 불꽃 뿜기 + 무지개 씹덕 파티클 난장판. */
+    private void awakenAura() {
+        if (!(this.level() instanceof ServerLevel sl)) return;
+        double cx = this.getX(), cy = this.getY() + 1.0, cz = this.getZ();
+        // 몸에서 불/영혼불 뿜기(위로 솟게 speed 살짝)
+        sl.sendParticles(ParticleTypes.FLAME, cx, cy, cz, 25, 0.4, 0.6, 0.4, 0.06);
+        sl.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, cx, cy, cz, 12, 0.4, 0.6, 0.4, 0.05);
+        // 무지개 씹덕 난장판(색색깔 파티클을 마구 뿌림)
+        sl.sendParticles(ParticleTypes.NOTE, cx, cy + 0.8, cz, 6, 0.6, 0.5, 0.6, 1.0);   // 무지개 음표
+        sl.sendParticles(ParticleTypes.HAPPY_VILLAGER, cx, cy, cz, 8, 0.5, 0.6, 0.5, 0.0);
+        sl.sendParticles(ParticleTypes.HEART, cx, cy + 0.6, cz, 3, 0.5, 0.4, 0.5, 0.0);
+        sl.sendParticles(ParticleTypes.CRIT, cx, cy, cz, 10, 0.5, 0.6, 0.5, 0.4);
+        sl.sendParticles(ParticleTypes.TOTEM_OF_UNDYING, cx, cy, cz, 8, 0.5, 0.6, 0.5, 0.3);
+        sl.sendParticles(ParticleTypes.ENCHANT, cx, cy + 1.0, cz, 8, 0.6, 0.6, 0.6, 0.2);
     }
 
     /** 죽을 만큼 맞으면 → 죽지 않고 '설사' 후 각성 시퀀스 시작. 웅장하게 안 보이며 똥을 뿜는다. */
