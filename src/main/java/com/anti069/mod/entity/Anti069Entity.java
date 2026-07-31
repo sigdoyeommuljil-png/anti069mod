@@ -563,10 +563,10 @@ public class Anti069Entity extends Monster implements NpcInventoryHolder {
                     }
                 }
             }
-            // 각성 상태에서 30블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
+            // 각성 상태에서 5블록 이내 플레이어에게 어둠 효과 (10틱마다 갱신)
             if (this.tickCount % 10 == 0) {
                 for (Player p : this.level().players()) {
-                    if (p.distanceToSqr(this) <= 15.0 * 15.0) {
+                    if (p.distanceToSqr(this) <= 5.0 * 5.0) {
                         p.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 30, 0, false, false));
                     }
                 }
