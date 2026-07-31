@@ -130,8 +130,9 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
 
         com.anti069.mod.ai.NpcCommands.tick(this); // 명령(따라오기 등) 유지
 
-        // '히든 캐릭터' 떡칠 오라: 각성 여부와 상관없이 항상 화려하게 유지
-        if (this.tickCount % 40 == 0) applyHiddenAura();
+        // '히든 캐릭터' 떡칠 오라: 각성 여부와 상관없이 항상 화려하게 유지.
+        // 단 설사(감싸질 때)엔 발광 윤곽선이 파티클 너머로 비쳐 짜치므로 오라를 끈다.
+        if (sphase != SPhase.SOILED && this.tickCount % 40 == 0) applyHiddenAura();
 
         // 설사(각성 전) 단계: 안 보이게 + 사방으로 똥 분출 + 치킨 스크림 도배, 잠시 뒤 각성
         if (sphase == SPhase.SOILED) {
@@ -216,6 +217,7 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
         this.getNavigation().stop();
         this.setNoAi(true);        // 그 자리에 멈춰서 연출
         this.setInvisible(true);   // 똥 오라에 가려 오서준은 안 보이게
+        this.removeAllEffects();   // 발광 등 기존 오라 즉시 제거(윤곽선 안 보이게)
         MinecraftServer server = server();
         if (server != null) {
             server.getPlayerList().broadcastSystemMessage(
@@ -227,21 +229,16 @@ public class Seojune5Entity extends PathfinderMob implements NpcInventoryHolder 
                 ModSounds.SEOJUNE_DISCORD, SoundSource.NEUTRAL, 1.0f, 1.0f);
     }
 
-    /** 5seojune을 중심으로 '똥' 파티클을 구체 껍질처럼 뿌려 똥 포스 필드를 만든다(아이템 안 뿌림 → 렉·잔해 없음). */
+    /** 5seojune을 '똥' 파티클로 완전히 뒤덮는 포스 필드. 성능 무시하고 부피를 꽉 채워 웅장하게. */
     private void forceField() {
         if (!(this.level() instanceof ServerLevel sl)) return;
-        // 커스텀 '똥' 아이템의 부스러기 파티클 = 갈색 똥 파티클
         ItemParticleOption ttongParticle = new ItemParticleOption(ParticleTypes.ITEM, ModItems.TTONG);
-        double r = 1.4; // 필드 반경
-        for (int i = 0; i < 40; i++) {
-            double u = this.random.nextDouble() * 2.0 - 1.0;
-            double t = this.random.nextDouble() * Math.PI * 2.0;
-            double s = Math.sqrt(1.0 - u * u);
-            double dx = s * Math.cos(t), dy = u, dz = s * Math.sin(t);
-            sl.sendParticles(ttongParticle,
-                    this.getX() + dx * r, this.getY() + 1.0 + dy * r, this.getZ() + dz * r,
-                    1, 0.0, 0.0, 0.0, 0.0);
-        }
+        double cx = this.getX(), cy = this.getY() + 1.0, cz = this.getZ();
+        // 한 번에 대량으로 퍼뜨려(속도 0) 빈틈 없이 채운다. spread(가로/세로/가로)로 덩치 조절.
+        // 여러 겹으로 뿌려 코어는 불투명하게, 바깥은 넉넉하게.
+        sl.sendParticles(ttongParticle, cx, cy, cz, 700, 0.55, 0.75, 0.55, 0.0); // 조밀한 코어
+        sl.sendParticles(ttongParticle, cx, cy, cz, 500, 1.0,  1.2,  1.0,  0.0); // 넉넉한 외곽
+        sl.sendParticles(ttongParticle, cx, cy, cz, 300, 1.4,  1.6,  1.4,  0.0); // 웅장한 최외곽
     }
 
     /** 커스텀 '똥' 아이템 1개. 진짜 염료가 아니라 주워도 쓸모없는 전용 아이템. */
